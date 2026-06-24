@@ -16,6 +16,7 @@ import SearchBar from "../../components/HomeScreen/SearchBar";
 import PromotionSlider from "../../components/HomeScreen/PromotionSlider";
 import CategoryList from "../../components/HomeScreen/CategoryList";
 import NewArrivals from "../../components/HomeScreen/NewArrivals";
+import CustomAlert from "../../components/CustomAlert/CustomAlert";
 
 const HomeScreen = ({ navigation, route }) => {
   const cartproduct = useSelector((state) => state.product);
@@ -29,6 +30,7 @@ const HomeScreen = ({ navigation, route }) => {
   const [error, setError] = useState("");
   const [userInfo, setUserInfo] = useState({});
   const [searchItems, setSearchItems] = useState([]);
+  const [scanError, setScanError] = useState("");
 
   //method to convert the authUser to json object
   const convertToJSON = (obj) => {
@@ -42,6 +44,19 @@ const HomeScreen = ({ navigation, route }) => {
   //method to navigate to product detail screen of a specific product
   const handleProductPress = (product) => {
     navigation.navigate("productdetail", { product: product });
+  };
+
+  const handleScanPress = () => {
+    setScanError("");
+    if (products.length === 0) {
+      setScanError(
+        error
+          ? "Load products before scanning. Check your connection and try again."
+          : "Load products before scanning."
+      );
+      return;
+    }
+    navigation.navigate("scan", { products, user });
   };
 
   //method to add to cart (redux)
@@ -98,6 +113,12 @@ const HomeScreen = ({ navigation, route }) => {
         <SearchBar
           searchItems={searchItems}
           handleProductPress={handleProductPress}
+          onScanPress={handleScanPress}
+        />
+        <CustomAlert
+          testID="home-scan-alert"
+          message={scanError}
+          type="error"
         />
         <ScrollView nestedScrollEnabled={true} testID="home-scroll">
           <PromotionSlider slides={slides} />

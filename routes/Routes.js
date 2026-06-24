@@ -14,6 +14,8 @@ import CartScreen from "../screens/user/CartScreen";
 import CheckoutScreen from "../screens/user/CheckoutScreen.js";
 import OrderConfirmScreen from "../screens/user/OrderConfirmScreen";
 import ProductDetailScreen from "../screens/user/ProductDetailScreen";
+import ScanScreen from "../screens/user/ScanScreen";
+import ScanNotFoundScreen from "../screens/user/ScanNotFoundScreen";
 import EditProductScreen from "../screens/admin/EditProductScreen";
 import ViewOrdersScreen from "../screens/admin/ViewOrdersScreen";
 import ViewOrderDetailScreen from "../screens/admin/ViewOrderDetailScreen";
@@ -51,6 +53,8 @@ const Routes = () => {
         <Stack.Screen name="checkout" component={CheckoutScreen} />
         <Stack.Screen name="orderconfirm" component={OrderConfirmScreen} />
         <Stack.Screen name="productdetail" component={ProductDetailScreen} />
+        <Stack.Screen name="scan" component={ScanScreen} />
+        <Stack.Screen name="scannotfound" component={ScanNotFoundScreen} />
         <Stack.Screen name="vieworder" component={ViewOrdersScreen} />
         <Stack.Screen
           name="vieworderdetails"
