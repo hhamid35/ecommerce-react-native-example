@@ -1,4 +1,4 @@
-# React-Native Ecommerce App :bomb:
+# React-Native Ecommerce App
 
 # Hi, We are Team Charlie! 👋
 
