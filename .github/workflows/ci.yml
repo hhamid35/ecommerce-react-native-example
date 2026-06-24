@@ -88,3 +88,5 @@ jobs:
         id: build
         run: |
           eas build --platform android --profile staging --non-interactive --json
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
