@@ -4,24 +4,27 @@
     "requireCommit": false
   },
   "build": {
-    "development": {
-      "developmentClient": false,
+    "local": {
+      "developmentClient": true,
+      "distribution": "internal",
       "environment": "development",
+      "channel": "local"
+    },
+    "staging": {
+      "developmentClient": false,
+      "distribution": "internal",
+      "credentialsSource": "remote",
+      "environment": "preview",
       "autoIncrement": true,
+      "ios": {
+        "enterpriseProvisioning": "universal",
+        "image": "latest"
+      },
       "android": {
         "buildType": "apk",
         "image": "latest"
       },
-      "ios": {
-      },
       "channel": "main"
-    },
-    "preview": {
-      "distribution": "internal"
-    },
-    "production": {}
-  },
-  "submit": {
-    "production": {}
+    }
   }
 }
