@@ -282,6 +282,204 @@ let orders = [
   },
 ];
 
+// ─── Password recovery module ─────────────────────────────────────────────────
+
+const OTP_EXPIRY_MS = 15 * 60 * 1000;
+const RESET_TOKEN_EXPIRY_MS = 10 * 60 * 1000;
+const OTP_LENGTH = 6;
+const MAX_VERIFY_ATTEMPTS = 5;
+const MAX_REQUESTS_PER_EMAIL_WINDOW = 3;
+const REQUEST_WINDOW_MS = 15 * 60 * 1000;
+const IS_MOCK_DELIVERY = process.env.NODE_ENV !== "production";
+
+let passwordRecoveryRequests = [];
+
+function generateOtp() {
+  const max = Math.pow(10, OTP_LENGTH);
+  const num = Math.floor(Math.random() * max);
+  return String(num).padStart(OTP_LENGTH, "0");
+}
+
+function findUserByEmail(email) {
+  const normalized = email.trim().toLowerCase();
+  return users.find((u) => u.email.trim().toLowerCase() === normalized);
+}
+
+function countRecentRequests(email) {
+  const normalized = email.trim().toLowerCase();
+  const windowStart = Date.now() - REQUEST_WINDOW_MS;
+  return passwordRecoveryRequests.filter(
+    (r) =>
+      r.email === normalized &&
+      new Date(r.createdAt).getTime() >= windowStart
+  ).length;
+}
+
+function invalidatePendingForEmail(email) {
+  const normalized = email.trim().toLowerCase();
+  passwordRecoveryRequests.forEach((r) => {
+    if (r.email === normalized && !r.consumed) {
+      r.consumed = true;
+    }
+  });
+}
+
+function deliverOtp(email, otp) {
+  if (IS_MOCK_DELIVERY) {
+    console.log(`dev_otp_issued: email=${email} otp=${otp}`);
+  }
+}
+
+// POST /password-recovery/request
+app.post("/password-recovery/request", (req, res) => {
+  const rawEmail = req.body.email;
+  if (!rawEmail || typeof rawEmail !== "string" || !rawEmail.trim().includes("@")) {
+    return res.status(400).json({ success: false, message: "Valid email is required" });
+  }
+
+  const email = rawEmail.trim().toLowerCase();
+
+  if (countRecentRequests(email) >= MAX_REQUESTS_PER_EMAIL_WINDOW) {
+    console.log("password_recovery_failed: reason=rate_limited");
+    return res
+      .status(429)
+      .json({ success: false, message: "Too many requests. Please try again later." });
+  }
+
+  const user = findUserByEmail(email);
+  let otp = null;
+
+  if (user) {
+    invalidatePendingForEmail(email);
+    otp = generateOtp();
+    const record = {
+      id: uuidv4(),
+      email,
+      otp,
+      expiresAt: new Date(Date.now() + OTP_EXPIRY_MS).toISOString(),
+      verified: false,
+      resetToken: null,
+      resetTokenExpiresAt: null,
+      consumed: false,
+      verifyAttempts: 0,
+      createdAt: new Date().toISOString(),
+    };
+    passwordRecoveryRequests.push(record);
+    deliverOtp(email, otp);
+    console.log("password_recovery_requested:", email);
+  }
+
+  const responseData =
+    IS_MOCK_DELIVERY && user ? { devOtp: otp } : {};
+
+  res.json({
+    success: true,
+    message: "If an account exists for this email, recovery instructions have been sent.",
+    data: responseData,
+  });
+});
+
+// POST /password-recovery/verify
+app.post("/password-recovery/verify", (req, res) => {
+  const rawEmail = req.body.email;
+  const otp = req.body.otp;
+
+  if (!rawEmail || !otp) {
+    return res
+      .status(400)
+      .json({ success: false, message: "Invalid or expired code. Request a new one." });
+  }
+
+  const email = rawEmail.trim().toLowerCase();
+  const record = passwordRecoveryRequests
+    .filter((r) => r.email === email && !r.consumed)
+    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))[0];
+
+  if (!record || new Date(record.expiresAt).getTime() <= Date.now()) {
+    console.log("password_recovery_failed: reason=invalid_or_expired");
+    return res
+      .status(400)
+      .json({ success: false, message: "Invalid or expired code. Request a new one." });
+  }
+
+  record.verifyAttempts += 1;
+
+  if (record.verifyAttempts > MAX_VERIFY_ATTEMPTS) {
+    record.consumed = true;
+    console.log("password_recovery_failed: reason=max_attempts");
+    return res
+      .status(429)
+      .json({ success: false, message: "Too many attempts. Request a new code." });
+  }
+
+  if (record.otp !== otp) {
+    console.log("password_recovery_failed: reason=invalid_otp");
+    return res
+      .status(400)
+      .json({ success: false, message: "Invalid or expired code. Request a new one." });
+  }
+
+  record.verified = true;
+  record.resetToken = uuidv4();
+  record.resetTokenExpiresAt = new Date(Date.now() + RESET_TOKEN_EXPIRY_MS).toISOString();
+  console.log("password_recovery_verified:", email);
+
+  res.json({
+    success: true,
+    message: "Code verified.",
+    data: { resetToken: record.resetToken },
+  });
+});
+
+// POST /password-recovery/reset
+app.post("/password-recovery/reset", (req, res) => {
+  const { email: rawEmail, resetToken, newPassword, confirmPassword } = req.body;
+
+  if (!newPassword || newPassword !== confirmPassword || newPassword.length < 6) {
+    return res.status(400).json({
+      success: false,
+      message: "Password must be at least 6 characters and match confirmation.",
+    });
+  }
+
+  if (!rawEmail || !resetToken) {
+    return res
+      .status(400)
+      .json({ success: false, message: "Recovery session expired. Please start again." });
+  }
+
+  const email = rawEmail.trim().toLowerCase();
+  const record = passwordRecoveryRequests.find(
+    (r) =>
+      r.email === email &&
+      r.resetToken === resetToken &&
+      r.verified &&
+      !r.consumed &&
+      r.resetTokenExpiresAt &&
+      new Date(r.resetTokenExpiresAt).getTime() > Date.now()
+  );
+
+  if (!record) {
+    console.log("password_recovery_failed: reason=expired_session");
+    return res
+      .status(400)
+      .json({ success: false, message: "Recovery session expired. Please start again." });
+  }
+
+  const user = findUserByEmail(email);
+  if (!user) {
+    return res
+      .status(400)
+      .json({ success: false, message: "Recovery session expired. Please start again." });
+  }
+
+  user.password = newPassword;
+  record.consumed = true;
+  console.log("password_recovery_completed:", user._id);
+
+  res.json({ success: true, message: "Password reset successfully." });
+});
+
 // ─── Auth middleware (simple token check) ─────────────────────────────────────
 const authMiddleware = (req, res, next) => {
   const token = req.headers["x-auth-token"];
@@ -595,35 +793,42 @@ app.get("/uploads/:filename", (req, res) => {
 });
 
 // ─── Start server ─────────────────────────────────────────────────────────────
-app.listen(PORT, "0.0.0.0", () => {
-  console.log(`\n🚀 EasyBuy Mock Server running at http://localhost:${PORT}`);
-  console.log(`\n📋 Available endpoints:`);
-  console.log(`   POST   /register`);
-  console.log(`   POST   /login`);
-  console.log(`   GET    /products`);
-  console.log(`   POST   /product              (admin)`);
-  console.log(`   POST   /update-product?id=   (admin)`);
-  console.log(`   GET    /delete-product?id=   (admin)`);
-  console.log(`   GET    /categories`);
-  console.log(`   POST   /category             (admin)`);
-  console.log(`   POST   /update-category?id=  (admin)`);
-  console.log(`   GET    /delete-category?id=  (admin)`);
-  console.log(`   GET    /dashboard            (admin)`);
-  console.log(`   GET    /admin/orders         (admin)`);
-  console.log(`   GET    /admin/users          (admin)`);
-  console.log(`   GET    /admin/order-status?orderId=&status=  (admin)`);
-  console.log(`   GET    /orders               (user)`);
-  console.log(`   POST   /checkout             (user)`);
-  console.log(`   GET    /delete-user?id=`);
-  console.log(`   POST   /reset-password?id=`);
-  console.log(`   POST   /photos/upload`);
-  console.log(`   GET    /uploads/:filename`);
-  console.log(`\n🔑 Test tokens:`);
-  console.log(`   Admin token : mock-admin-token-001`);
-  console.log(`   User token  : mock-user-token-001`);
-  console.log(`\n👤 Test credentials:`);
-  console.log(`   Admin  → email: admin@easybuy.com  | password: admin123`);
-  console.log(`   User   → email: user@easybuy.com   | password: user123\n`);
-});
+if (require.main === module) {
+  app.listen(PORT, "0.0.0.0", () => {
+    console.log(`\n🚀 EasyBuy Mock Server running at http://localhost:${PORT}`);
+    console.log(`\n📋 Available endpoints:`);
+    console.log(`   POST   /register`);
+    console.log(`   POST   /login`);
+    console.log(`   POST   /password-recovery/request`);
+    console.log(`   POST   /password-recovery/verify`);
+    console.log(`   POST   /password-recovery/reset`);
+    console.log(`   GET    /products`);
+    console.log(`   POST   /product              (admin)`);
+    console.log(`   POST   /update-product?id=   (admin)`);
+    console.log(`   GET    /delete-product?id=   (admin)`);
+    console.log(`   GET    /categories`);
+    console.log(`   POST   /category             (admin)`);
+    console.log(`   POST   /update-category?id=  (admin)`);
+    console.log(`   GET    /delete-category?id=  (admin)`);
+    console.log(`   GET    /dashboard            (admin)`);
+    console.log(`   GET    /admin/orders         (admin)`);
+    console.log(`   GET    /admin/users          (admin)`);
+    console.log(`   GET    /admin/order-status?orderId=&status=  (admin)`);
+    console.log(`   GET    /orders               (user)`);
+    console.log(`   POST   /checkout             (user)`);
+    console.log(`   GET    /delete-user?id=`);
+    console.log(`   POST   /reset-password?id=`);
+    console.log(`   POST   /photos/upload`);
+    console.log(`   GET    /uploads/:filename`);
+    console.log(`\n🔑 Test tokens:`);
+    console.log(`   Admin token : mock-admin-token-001`);
+    console.log(`   User token  : mock-user-token-001`);
+    console.log(`\n👤 Test credentials:`);
+    console.log(`   Admin  → email: admin@easybuy.com  | password: admin123`);
+    console.log(`   User   → email: user@easybuy.com   | password: user123\n`);
+  });
+}
+
+module.exports = app;
 
 // Made with Bob

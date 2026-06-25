@@ -18,44 +18,29 @@ import ProgressDialog from "react-native-progress-dialog";
 import ConnectionAlert from "../../components/ConnectionAlert/ConnectionAlert";
 import * as authStorage from "../../utils/authStorage";
 
-// Hardcoded credentials
-const HARDCODED_USERS = [
-  {
-    _id: "admin001",
-    name: "Admin User",
-    email: "admin@easybuy.com",
-    password: "admin123",
-    userType: "ADMIN",
-  },
-  {
-    _id: "user001",
-    name: "Regular User",
-    email: "user@easybuy.com",
-    password: "user123",
-    userType: "USER",
-  },
-];
-
-const LoginScreen = ({ navigation }) => {
+const LoginScreen = ({ navigation, route }) => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [successMessage, setSuccessMessage] = useState(
+    route.params?.recoverySuccess
+      ? "Password updated. Sign in with your new password."
+      : ""
+  );
   const [isloading, setIsloading] = useState(false);
 
-  //method to store the authUser to secure storage
   const _storeData = async (user) => {
     try {
       await authStorage.setItem("authUser", JSON.stringify(user));
-    } catch (error) {
-      console.log(error);
-      setError(error);
+    } catch (storageError) {
+      console.log(storageError);
+      setError(storageError.message || "Failed to save session");
     }
   };
 
-  //method to validate the user credentials and navigate to Home Screen / Dashboard
   const loginHandle = () => {
     setIsloading(true);
-    //[check validation] -- Start
+    setSuccessMessage("");
     if (email == "") {
       setIsloading(false);
       return setError("Please enter your email");
@@ -76,31 +61,39 @@ const LoginScreen = ({ navigation }) => {
       setIsloading(false);
       return setError("Password must be 6 characters long");
     }
-    //[check validation] -- End
 
-    // Hardcoded credential check (bypasses API)
-    const matchedUser = HARDCODED_USERS.find(
-      (u) => u.email === email && u.password === password
-    );
+    const myHeaders = new Headers();
+    myHeaders.append("Content-Type", "application/json");
 
-    if (matchedUser) {
-      _storeData(matchedUser);
-      setIsloading(false);
-      if (matchedUser.userType === "ADMIN") {
-        navigation.replace("dashboard", { authUser: matchedUser });
-      } else {
-        navigation.replace("tab", { user: matchedUser });
-      }
-    } else {
-      setIsloading(false);
-      setError("Invalid email or password");
-    }
+    fetch(network.serverip + "/login", {
+      method: "POST",
+      headers: myHeaders,
+      body: JSON.stringify({ email, password }),
+    })
+      .then((response) => response.json())
+      .then((result) => {
+        setIsloading(false);
+        if (result.success && result.data) {
+          _storeData(result.data);
+          if (result.data.userType === "ADMIN") {
+            navigation.replace("dashboard", { authUser: result.data });
+          } else {
+            navigation.replace("tab", { user: result.data });
+          }
+        } else {
+          setError(result.message || "Invalid email or password");
+        }
+      })
+      .catch((fetchError) => {
+        setIsloading(false);
+        console.log("error", fetchError);
+        setError(fetchError.message || "Network error");
+      });
   };
 
   return (
-    <ConnectionAlert onChange={(connectionState) => {}}>
+    <ConnectionAlert onChange={() => {}}>
       <KeyboardAvoidingView
-        // behavior={Platform.OS === "ios" ? "padding" : "height"}
         style={styles.container}
         testID="login-screen"
       >
@@ -122,6 +115,9 @@ const LoginScreen = ({ navigation }) => {
             <Text style={styles.screenNameText} testID="login-heading">Login</Text>
           </View>
           <View style={styles.formContainer}>
+            {successMessage ? (
+              <CustomAlert message={successMessage} type={"success"} testID="login-success-alert" />
+            ) : null}
             <CustomAlert message={error} type={"error"} testID="login-alert" />
             <CustomInput
               value={email}
@@ -188,7 +184,6 @@ const styles = StyleSheet.create({
     justifyContent: "space-around",
     alignItems: "center",
     height: "30%",
-    // padding:15
   },
   formContainer: {
     flex: 3,
