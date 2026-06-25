@@ -1,0 +1,103 @@
+appId: com.abidrazaa.EasyBuy
+name: "Unknown scanned code shows Scan Not Found screen (D-5 Happy Path)"
+tags:
+    - scan-not-found
+---
+
+# Prerequisites: logged-in shopper; camera permission granted; mock server running; barcode encoding INVALID-999
+
+# AC 1: Launch the application
+- launchApp
+- assertVisible:
+    id: "splash-screen"
+
+# AC 2: Wait for automatic navigation from Splash to Tabs
+- extendedWaitUntil:
+    notVisible:
+      id: "splash-screen"
+    timeout: 30000
+- waitForAnimationToEnd
+- runFlow:
+    when:
+      visible:
+        id: "login-screen"
+    commands:
+      - assertVisible:
+          id: "login-screen"
+- runFlow:
+    when:
+      notVisible:
+        id: "login-screen"
+    commands:
+      - assertVisible:
+          id: "tab-home-icon"
+      - assertVisible:
+          id: "tab-categories-icon"
+
+# Prerequisite: User is logged in as a shopper
+- runFlow:
+    when:
+      visible:
+        id: "login-screen"
+    commands:
+      - tapOn:
+          id: "login-email-input"
+      - inputText: "user@easybuy.com"
+      - tapOn:
+          id: "login-password-input"
+      - inputText: "user123"
+      - hideKeyboard
+      - tapOn:
+          id: "login-submit-btn"
+      - waitForAnimationToEnd
+      - assertVisible:
+          id: "tab-home-icon"
+
+# AC 3: Tap the Home tab
+- tapOn:
+    id: "tab-home-icon"
+- assertVisible:
+    id: "home-screen"
+
+# AC 4: Tap the Scan button (search-bar-scan-btn)
+- tapOn:
+    id: "search-bar-scan-btn"
+- extendedWaitUntil:
+    visible:
+      id: "scan-screen"
+    timeout: 30000
+# Prerequisite: Camera permission is granted — wait for camera scan UI
+- extendedWaitUntil:
+    visible:
+      id: "scan-camera-view"
+    timeout: 30000
+- assertVisible:
+    id: "scan-camera-view"
+
+# AC 5: Scan a barcode or QR code encoding INVALID-999
+# NOTE: Android — inject barcode via sub-flow camera mock; physical iOS requires on-screen QR target
+- runFlow:
+    file: scan-inject-barcode.yaml
+    env:
+      BARCODE: "INVALID-999"
+
+# AC 5: ScanNotFoundScreen is displayed with scan-not-found-screen visible
+- extendedWaitUntil:
+    visible:
+      id: "scan-not-found-screen"
+    timeout: 30000
+- waitForAnimationToEnd
+- assertVisible:
+    id: "scan-not-found-screen"
+
+# AC 6: Verify not-found screen content
+- assertVisible: ".*Product not found.*"
+- assertVisible:
+    id: "scan-not-found-code"
+- assertVisible: ".*INVALID-999.*"
+- assertVisible:
+    id: "scan-again-btn"
+- assertVisible:
+    id: "search-manually-btn"
+- assertVisible:
+    id: "browse-categories-btn"

@@ -1,0 +1,33 @@
+appId: com.abidrazaa.EasyBuy
+name: "Scan flow requires signed-in shopper (Negative)"
+tags:
+    - scan
+    - negative
+    - authentication
+---
+
+# Prerequisites: Ensure user is not logged in
+- clearState
+- launchApp
+
+# AC 1: Launch the application
+- assertVisible:
+    id: "splash-screen"
+
+# AC 2: Wait for automatic navigation from Splash
+- extendedWaitUntil:
+    notVisible:
+      id: "splash-screen"
+    timeout: 30000
+- assertVisible:
+    id: "login-screen"
+
+# AC 3: Verify Scan button is not reachable without authentication
+- assertNotVisible:
+    id: "home-screen"
+- assertNotVisible:
+    id: "search-bar"
+- assertNotVisible:
+    id: "search-bar-scan-btn"
+- assertNotVisible:
+    id: "scan-screen"

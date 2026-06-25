@@ -1,0 +1,64 @@
+appId: com.abidrazaa.EasyBuy
+name: "Home Scan button opens full-screen Scan screen (D-1 Happy Path)"
+tags:
+    - scan
+    - home-scan
+---
+
+# AC 1: Launch the application
+- launchApp
+- assertVisible:
+    id: "splash-screen"
+
+# AC 2: Wait for automatic navigation from Splash
+- extendedWaitUntil:
+    notVisible:
+      id: "splash-screen"
+    timeout: 30000
+
+# Prerequisite: User is logged in as a shopper
+- runFlow:
+    when:
+      visible:
+        id: "login-screen"
+    commands:
+      - tapOn:
+          id: "login-email-input"
+      - inputText: "user@easybuy.com"
+      - tapOn:
+          id: "login-password-input"
+      - inputText: "user123"
+      - hideKeyboard
+      - tapOn:
+          id: "login-submit-btn"
+      - waitForAnimationToEnd
+      - extendedWaitUntil:
+          notVisible:
+            id: "login-screen"
+          timeout: 30000
+
+# AC 2: Bottom tab navigator (Tabs) is displayed
+# NOTE: tab-home-icon resolved from Tabs.js (source lookup)
+- assertVisible:
+    id: "tab-home-icon"
+
+# AC 3: Tap the Home tab on the bottom tab navigator
+- tapOn:
+    id: "tab-home-icon"
+- assertVisible:
+    id: "home-screen"
+- assertVisible:
+    id: "search-bar"
+
+# AC 4: Verify the Scan button is visible in the SearchBar
+- assertVisible:
+    id: "search-bar-scan-btn"
+- assertVisible:
+    id: "search-bar-scan-text"
+- assertVisible: ".*Scan.*"
+
+# AC 5: Tap the Scan button (search-bar-scan-btn)
+- tapOn:
+    id: "search-bar-scan-btn"
+- assertVisible:
+    id: "scan-screen"

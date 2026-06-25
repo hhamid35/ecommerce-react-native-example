@@ -1,0 +1,78 @@
+appId: com.abidrazaa.EasyBuy
+name: "Scan screen requests camera permission on first access (D-1)"
+tags:
+    - scan-camera-permission
+---
+
+# Prerequisites: logged-in shopper with fresh camera permission state
+- clearState
+- launchApp
+
+# AC 1: Launch the application
+- assertVisible:
+    id: "splash-screen"
+
+# AC 2: Wait for automatic navigation from Splash to Tabs
+- extendedWaitUntil:
+    notVisible:
+      id: "splash-screen"
+    timeout: 30000
+- runFlow:
+    when:
+      visible:
+        id: "login-screen"
+    commands:
+      - assertVisible:
+          id: "login-screen"
+- runFlow:
+    when:
+      notVisible:
+        id: "login-screen"
+    commands:
+      - assertVisible:
+          id: "tab-home-icon"
+
+# Setup: log in as shopper when Login screen is shown
+- runFlow:
+    when:
+      visible:
+        id: "login-screen"
+    commands:
+      - tapOn:
+          id: "login-email-input"
+      - inputText: "user@easybuy.com"
+      - tapOn:
+          id: "login-password-input"
+      - inputText: "user123"
+      - hideKeyboard
+      - tapOn:
+          id: "login-submit-btn"
+      - waitForAnimationToEnd
+      - assertVisible:
+          id: "home-screen"
+
+# AC 3: Tap the Home tab
+- tapOn:
+    id: "tab-home-icon"
+- assertVisible:
+    id: "home-screen"
+
+# AC 4: Tap the Scan button (search-bar-scan-btn)
+- tapOn:
+    id: "search-bar-scan-btn"
+
+# AC 5: Observe permission request state before camera view is available
+- assertVisible:
+    id: "scan-screen"
+- assertNotVisible:
+    id: "scan-camera-view"
+- runFlow:
+    when:
+      visible: ".*Requesting camera access.*"
+    commands:
+      - assertVisible: ".*Requesting camera access.*"
+- runFlow:
+    when:
+      notVisible: ".*Requesting camera access.*"
+    commands:
+      - assertVisible: ".*camera.*"

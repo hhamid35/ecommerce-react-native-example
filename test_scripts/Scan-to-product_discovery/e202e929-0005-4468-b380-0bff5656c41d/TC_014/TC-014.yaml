@@ -1,0 +1,114 @@
+appId: com.abidrazaa.EasyBuy
+name: "Network error on scan shows inline retry banner (Negative)"
+tags:
+    - scan-network-error
+    - network-error
+---
+
+# Prerequisites: logged-in shopper; camera permission granted; network disabled or mock server stopped for lookup failure
+
+# AC 2: Launch the application
+- launchApp
+- assertVisible:
+    id: "splash-screen"
+
+# AC 3: Wait for automatic navigation from Splash to Tabs
+- extendedWaitUntil:
+    notVisible:
+      id: "splash-screen"
+    timeout: 30000
+- waitForAnimationToEnd
+- runFlow:
+    when:
+      visible:
+        id: "login-screen"
+    commands:
+      - assertVisible:
+          id: "login-screen"
+- runFlow:
+    when:
+      notVisible:
+        id: "login-screen"
+    commands:
+      - assertVisible:
+          id: "tab-home-icon"
+      - assertVisible:
+          id: "tab-categories-icon"
+
+# Prerequisite: User is logged in as a shopper
+- runFlow:
+    when:
+      visible:
+        id: "login-screen"
+    commands:
+      - tapOn:
+          id: "login-email-input"
+      - inputText: "user@easybuy.com"
+      - tapOn:
+          id: "login-password-input"
+      - inputText: "user123"
+      - hideKeyboard
+      - tapOn:
+          id: "login-submit-btn"
+      - waitForAnimationToEnd
+      - assertVisible:
+          id: "tab-home-icon"
+
+# AC 4: Tap the Home tab
+- tapOn:
+    id: "tab-home-icon"
+- assertVisible:
+    id: "home-screen"
+
+# AC 1: Ensure mock server is unreachable or network is disabled
+- setAirplaneMode: enabled
+
+# AC 5: Tap the Scan button (search-bar-scan-btn)
+- tapOn:
+    id: "search-bar-scan-btn"
+- extendedWaitUntil:
+    visible:
+      id: "scan-screen"
+    timeout: 30000
+# Prerequisite: Camera permission is granted — wait for camera scan UI
+- extendedWaitUntil:
+    visible:
+      id: "scan-camera-view"
+    timeout: 30000
+- assertVisible:
+    id: "scan-camera-view"
+
+# AC 6: Scan any barcode or QR code
+# NOTE: Android — inject barcode via sub-flow camera mock; physical iOS requires on-screen QR target
+- runFlow:
+    file: scan-inject-barcode.yaml
+    env:
+      BARCODE: "GAR-001"
+
+# AC 6: scan-network-error banner is displayed; user remains on ScanScreen
+- extendedWaitUntil:
+    visible:
+      id: "scan-network-error"
+    timeout: 30000
+- waitForAnimationToEnd
+- assertVisible:
+    id: "scan-network-error"
+- assertVisible: ".*Couldn't reach the store.*"
+- assertVisible: ".*Retry.*"
+- assertVisible:
+    id: "scan-screen"
+- assertVisible:
+    id: "scan-camera-view"
+- assertNotVisible:
+    id: "scan-not-found-screen"
+
+# AC 7: Restore network and tap Retry on the error banner
+- setAirplaneMode: disabled
+- tapOn: ".*Retry.*"
+- waitForAnimationToEnd
+- assertNotVisible:
+    id: "scan-network-error"
+- assertVisible:
+    id: "scan-screen"
+- assertVisible:
+    id: "scan-camera-view"

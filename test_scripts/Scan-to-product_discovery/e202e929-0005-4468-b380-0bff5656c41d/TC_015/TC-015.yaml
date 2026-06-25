@@ -1,0 +1,103 @@
+appId: com.abidrazaa.EasyBuy
+name: "Rapid double-scan is debounced (Edge)"
+tags:
+    - rapid-double-scan-debounce
+---
+
+# Prerequisites: logged-in shopper; camera permission granted; mock server with GAR-001; barcode test data
+
+# AC 1: Launch the application
+- launchApp
+- assertVisible:
+    id: "splash-screen"
+
+# AC 2: Wait for automatic navigation from Splash to Tabs
+- extendedWaitUntil:
+    notVisible:
+      id: "splash-screen"
+    timeout: 30000
+- waitForAnimationToEnd
+- runFlow:
+    when:
+      visible:
+        id: "login-screen"
+    commands:
+      - assertVisible:
+          id: "login-screen"
+- runFlow:
+    when:
+      notVisible:
+        id: "login-screen"
+    commands:
+      - assertVisible:
+          id: "tab-home-icon"
+      - assertVisible:
+          id: "tab-categories-icon"
+
+# Prerequisite: User is logged in as a shopper
+- runFlow:
+    when:
+      visible:
+        id: "login-screen"
+    commands:
+      - tapOn:
+          id: "login-email-input"
+      - inputText: "user@easybuy.com"
+      - tapOn:
+          id: "login-password-input"
+      - inputText: "user123"
+      - hideKeyboard
+      - tapOn:
+          id: "login-submit-btn"
+      - waitForAnimationToEnd
+      - assertVisible:
+          id: "tab-home-icon"
+
+# AC 3: Tap the Home tab
+- tapOn:
+    id: "tab-home-icon"
+- assertVisible:
+    id: "home-screen"
+
+# AC 4: Tap the Scan button (search-bar-scan-btn)
+- tapOn:
+    id: "search-bar-scan-btn"
+- extendedWaitUntil:
+    visible:
+      id: "scan-screen"
+    timeout: 30000
+# Prerequisite: Camera permission is granted — wait for camera scan UI
+- extendedWaitUntil:
+    visible:
+      id: "scan-camera-view"
+    timeout: 30000
+- assertVisible:
+    id: "scan-camera-view"
+
+# AC 5: Trigger multiple rapid onBarcodeScanned events for SKU GAR-001
+# NOTE: Android — rapid barcode injection via sub-flow simulates duplicate scan firings; physical iOS requires on-screen QR target
+- repeat:
+    times: 5
+    commands:
+      - runFlow:
+          file: scan-inject-barcode.yaml
+          env:
+            BARCODE: "GAR-001"
+
+# AC 5: Only one lookup resolves — ProductDetailScreen reached without duplicate navigation
+- extendedWaitUntil:
+    visible:
+      id: "product-detail-screen"
+    timeout: 30000
+- waitForAnimationToEnd
+- assertNotVisible:
+    id: "scan-screen"
+- assertNotVisible:
+    id: "scan-not-found-screen"
+
+# AC 6: Verify single product detail presentation for scanned SKU GAR-001
+- assertVisible:
+    id: "product-detail-screen"
+- assertVisible:
+    id: "product-detail-title"
+- assertVisible: ".*Classic White T-Shirt.*"

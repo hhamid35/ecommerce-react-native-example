@@ -1,0 +1,71 @@
+appId: com.abidrazaa.EasyBuy
+name: "Camera permission denied shows recovery UI (D-1 Negative)"
+tags:
+    - camera-permission-denied
+---
+
+# Prerequisites: logged-in shopper; camera permission denied for the application (device setup)
+
+# AC 1: Launch the application
+- launchApp
+
+# AC 2: Wait for automatic navigation from Splash to Tabs
+- assertVisible:
+    id: "splash-screen"
+- extendedWaitUntil:
+    notVisible:
+      id: "splash-screen"
+    timeout: 30000
+
+# Prerequisite: ensure shopper is logged in
+- runFlow:
+    when:
+      visible:
+        id: "login-screen"
+    commands:
+      - tapOn:
+          id: "login-email-input"
+      - inputText: "user@easybuy.com"
+      - tapOn:
+          id: "login-password-input"
+      - inputText: "user123"
+      - hideKeyboard
+      - tapOn:
+          id: "login-submit-btn"
+      - waitForAnimationToEnd
+
+- extendedWaitUntil:
+    visible:
+      id: "tab-home-icon"
+    timeout: 30000
+
+# AC 3: Tap the Home tab
+- tapOn:
+    id: "tab-home-icon"
+- assertVisible:
+    id: "home-screen"
+
+# AC 4: Tap the Scan button (search-bar-scan-btn)
+- tapOn:
+    id: "search-bar-scan-btn"
+- assertVisible:
+    id: "scan-screen"
+- assertVisible:
+    id: "scan-permission-denied"
+
+# AC 5: Verify permission denied messaging and recovery options
+- assertVisible: ".*Camera access is needed.*"
+- assertVisible:
+    id: "scan-settings-btn"
+- assertVisible: ".*Go to Settings.*"
+- assertVisible:
+    id: "scan-search-instead-btn"
+- assertVisible: ".*Back to Home.*"
+
+# AC 6: Tap Back to Home or Search instead
+- tapOn:
+    id: "scan-search-instead-btn"
+
+# AC 6 expected: User returns to HomeScreen
+- assertVisible:
+    id: "home-screen"

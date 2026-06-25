@@ -1,0 +1,84 @@
+appId: com.abidrazaa.EasyBuy
+name: "Scan screen shows camera viewfinder when permission granted (D-1)"
+tags:
+    - scan-camera-viewfinder
+---
+
+# Prerequisites: logged-in shopper; camera permission granted (device setup)
+
+# AC 1: Launch the application
+- launchApp
+- assertVisible:
+    id: "splash-screen"
+
+# AC 2: Wait for automatic navigation from Splash to Tabs
+- extendedWaitUntil:
+    notVisible:
+      id: "splash-screen"
+    timeout: 30000
+- waitForAnimationToEnd
+- runFlow:
+    when:
+      visible:
+        id: "login-screen"
+    commands:
+      - assertVisible:
+          id: "login-screen"
+- runFlow:
+    when:
+      notVisible:
+        id: "login-screen"
+    commands:
+      - assertVisible:
+          id: "tab-home-icon"
+      - assertVisible:
+          id: "tab-categories-icon"
+
+# Prerequisite: User is logged in as a shopper
+- runFlow:
+    when:
+      visible:
+        id: "login-screen"
+    commands:
+      - tapOn:
+          id: "login-email-input"
+      - inputText: "user@easybuy.com"
+      - tapOn:
+          id: "login-password-input"
+      - inputText: "user123"
+      - hideKeyboard
+      - tapOn:
+          id: "login-submit-btn"
+      - waitForAnimationToEnd
+      - assertVisible:
+          id: "tab-home-icon"
+
+# AC 3: Tap the Home tab
+- tapOn:
+    id: "tab-home-icon"
+- assertVisible:
+    id: "home-screen"
+
+# AC 4: Tap the Scan button (search-bar-scan-btn)
+- tapOn:
+    id: "search-bar-scan-btn"
+- extendedWaitUntil:
+    visible:
+      id: "scan-screen"
+    timeout: 30000
+
+# AC 5: Verify camera granted UI elements
+# Prerequisite: Camera permission is granted — wait for camera scan UI
+- extendedWaitUntil:
+    visible:
+      id: "scan-camera-view"
+    timeout: 30000
+- assertNotVisible:
+    id: "scan-permission-denied"
+- assertVisible:
+    id: "scan-camera-view"
+- assertVisible:
+    id: "scan-close-btn"
+# NOTE: viewfinder corners lack testIDs; instruction text confirms viewfinder overlay
+- assertVisible: ".*Align barcode or QR code within the frame.*"
+- assertVisible: ".*Point camera at barcode or QR code.*"
