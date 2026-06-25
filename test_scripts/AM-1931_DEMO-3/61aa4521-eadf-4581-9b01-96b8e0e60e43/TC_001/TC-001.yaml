@@ -1,0 +1,91 @@
+appId: com.abidrazaa.EasyBuy
+name: "Flight Info Card - Navigate from list to details and verify card is displayed"
+tags:
+    - flight-info-card-navigation
+---
+
+# AC 1: Launch the application
+- launchApp
+- assertVisible:
+    id: "splash-screen"
+
+# AC 2: Wait for splash navigation to complete
+- extendedWaitUntil:
+    notVisible:
+      id: "splash-screen"
+    timeout: 30000
+- waitForAnimationToEnd
+- runFlow:
+    when:
+      visible:
+        id: "login-screen"
+    commands:
+      - assertVisible:
+          id: "login-screen"
+- runFlow:
+    when:
+      notVisible:
+        id: "login-screen"
+    commands:
+      - assertVisible:
+          id: "tab-home-icon"
+      - assertVisible:
+          id: "tab-categories-icon"
+
+# Prerequisite: User is logged in to the application
+- runFlow:
+    when:
+      visible:
+        id: "login-screen"
+    commands:
+      - tapOn:
+          id: "login-email-input"
+      - inputText: "user@easybuy.com"
+      - tapOn:
+          id: "login-password-input"
+      - inputText: "user123"
+      - hideKeyboard
+      - tapOn:
+          id: "login-submit-btn"
+      - waitForAnimationToEnd
+      - assertVisible:
+          id: "tab-home-icon"
+
+# AC 3: Tap the Home tab in the bottom tab bar
+# NOTE: tab-home-icon resolved from Tabs.js (source lookup)
+- tapOn:
+    id: "tab-home-icon"
+- assertVisible:
+    id: "home-screen"
+
+# AC 4: Tap the first visible flight tile in the list on HomeScreen
+- extendedWaitUntil:
+    notVisible:
+      id: "new-arrivals-empty"
+    timeout: 30000
+- evalScript: ${output.scrollAttempt = 0}
+- repeat:
+    times: 10
+    while:
+      notVisible:
+        id: "new-arrivals-product-0"
+    commands:
+      - swipe:
+          from:
+            id: "home-scroll"
+          direction: UP
+          duration: 400
+      - evalScript: ${output.scrollAttempt = output.scrollAttempt + 1}
+- tapOn:
+    id: "new-arrivals-product-0"
+    below:
+      id: "new-arrivals-heading"
+    index: 0
+- waitForAnimationToEnd
+- assertVisible:
+    id: "product-detail-screen"
+
+# AC 5: Verify the flight info card section at the top of ProductDetailScreen
+# MANUAL REVIEW: flight-info-card elements are not present in dom_extract.json; asserting product-detail-image as top content proxy
+- assertVisible:
+    id: "product-detail-image"

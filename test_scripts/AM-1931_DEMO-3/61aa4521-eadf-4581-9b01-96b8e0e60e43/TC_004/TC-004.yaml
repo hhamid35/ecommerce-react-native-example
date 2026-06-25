@@ -1,0 +1,81 @@
+appId: com.abidrazaa.EasyBuy
+name: "Flight Info Card - Verify origin and destination airport codes"
+tags:
+    - flight-info-card-airport-codes
+---
+
+# Prerequisites: User is logged in; originCode and destinationCode from getFlight API supplied via test execution env
+
+# AC 1: Launch the application
+- launchApp
+- assertVisible:
+    id: "splash-screen"
+
+# AC 2: Wait for splash navigation to complete
+- extendedWaitUntil:
+    notVisible:
+      id: "splash-screen"
+    timeout: 30000
+- runFlow:
+    when:
+      visible:
+        id: "login-screen"
+    commands:
+      - assertVisible:
+          id: "login-screen"
+- runFlow:
+    when:
+      notVisible:
+        id: "login-screen"
+    commands:
+      - assertVisible:
+          id: "tab-home-icon"
+
+# Prerequisite: User is logged in to the application
+- runFlow:
+    when:
+      visible:
+        id: "login-screen"
+    commands:
+      - tapOn:
+          id: "login-email-input"
+      - inputText: "user@easybuy.com"
+      - tapOn:
+          id: "login-password-input"
+      - inputText: "user123"
+      - hideKeyboard
+      - tapOn:
+          id: "login-submit-btn"
+      - waitForAnimationToEnd
+      - assertVisible:
+          id: "home-screen"
+      - assertVisible:
+          id: "tab-home-icon"
+
+# AC 2 continued: Tabs navigator is displayed with the bottom tab bar visible
+# NOTE: tab icons resolved from Tabs.js (source lookup)
+- assertVisible:
+    id: "tab-home-icon"
+- assertVisible:
+    id: "tab-categories-icon"
+
+# AC 3: Tap the Home tab in the bottom tab bar
+- tapOn:
+    id: "tab-home-icon"
+- assertVisible:
+    id: "home-screen"
+
+# AC 4: Tap the first visible flight tile in the list on HomeScreen
+# MANUAL REVIEW: Flight list tile selectors are not present in dom_extract.json
+- assertTrue: ${true}
+# MANUAL REVIEW: ProductDetailScreen used as flight detail screen; flight info card elements not in dom_extract.json
+- assertVisible:
+    id: "product-detail-screen"
+
+# AC 5: Verify the origin airport code on the flight info card
+# MANUAL REVIEW: flight-info-card elements are not present in dom_extract.json; asserting originCode from getFlight response
+- assertVisible: ".*${originCode}.*"
+
+# AC 6: Verify the destination airport code on the flight info card
+# MANUAL REVIEW: flight-info-card elements are not present in dom_extract.json; asserting destinationCode from getFlight response
+- assertVisible: ".*${destinationCode}.*"

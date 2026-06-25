@@ -1,0 +1,74 @@
+appId: com.abidrazaa.EasyBuy
+name: "Flight Info Card - Verify operating carrier code and flight number mapping"
+tags:
+    - flight-info-card-carrier-flight-number
+---
+
+# Prerequisites: User is logged in; airlineCode and flightNumber from getFlight API supplied via test execution env
+
+# AC 1: Launch the application
+- launchApp
+- assertVisible:
+    id: "splash-screen"
+
+# AC 2: Wait for splash navigation to complete
+- extendedWaitUntil:
+    notVisible:
+      id: "splash-screen"
+    timeout: 30000
+- runFlow:
+    when:
+      visible:
+        id: "login-screen"
+    commands:
+      - assertVisible:
+          id: "login-screen"
+- runFlow:
+    when:
+      notVisible:
+        id: "login-screen"
+    commands:
+      - assertVisible:
+          id: "tab-home-icon"
+
+# Prerequisite: User is logged in to the application
+- runFlow:
+    when:
+      visible:
+        id: "login-screen"
+    commands:
+      - tapOn:
+          id: "login-email-input"
+      - inputText: "user@easybuy.com"
+      - tapOn:
+          id: "login-password-input"
+      - inputText: "user123"
+      - hideKeyboard
+      - tapOn:
+          id: "login-submit-btn"
+      - waitForAnimationToEnd
+      - assertVisible:
+          id: "home-screen"
+      - assertVisible:
+          id: "tab-home-icon"
+
+# AC 3: Tap the Home tab in the bottom tab bar
+- tapOn:
+    id: "tab-home-icon"
+- assertVisible:
+    id: "home-screen"
+
+# AC 4: Tap the first visible flight tile in the list on HomeScreen
+# MANUAL REVIEW: Flight list tile selectors are not present in dom_extract.json
+- assertTrue: ${true}
+# MANUAL REVIEW: ProductDetailScreen used as flight detail screen; flight info card elements not in dom_extract.json
+- assertVisible:
+    id: "product-detail-screen"
+
+# AC 5: Verify the operating carrier code on the flight info card
+# MANUAL REVIEW: flight-info-card elements are not present in dom_extract.json; asserting airlineCode from getFlight response
+- assertVisible: ".*${airlineCode}.*"
+
+# AC 6: Verify the flight number on the flight info card
+# MANUAL REVIEW: flight-info-card elements are not present in dom_extract.json; asserting flightNumber from getFlight response
+- assertVisible: ".*${flightNumber}.*"

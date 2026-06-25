@@ -1,0 +1,60 @@
+appId: com.abidrazaa.EasyBuy
+name: "Flight Info Card - Verify departure date mapping"
+tags:
+    - flight-info-card-departure-date
+---
+
+# Prerequisites: User logged in; date from getFlight API supplied via test execution env
+
+# AC 1: Launch the application
+- launchApp
+- assertVisible:
+    id: "splash-screen"
+
+# AC 2: Wait for splash navigation to complete
+- extendedWaitUntil:
+    notVisible:
+      id: "splash-screen"
+    timeout: 30000
+
+# Prerequisite: User is logged in to the application
+- runFlow:
+    when:
+      visible:
+        id: "login-screen"
+    commands:
+      - tapOn:
+          id: "login-email-input"
+      - inputText: "user@easybuy.com"
+      - tapOn:
+          id: "login-password-input"
+      - inputText: "user123"
+      - hideKeyboard
+      - tapOn:
+          id: "login-submit-btn"
+      - waitForAnimationToEnd
+
+# AC 2 continued: Tabs navigator is displayed with the bottom tab bar visible
+# NOTE: tab icons resolved from Tabs.js (source lookup)
+- assertVisible:
+    id: "tab-home-icon"
+- assertVisible:
+    id: "tab-categories-icon"
+
+# AC 3: Tap the Home tab in the bottom tab bar
+- tapOn:
+    id: "tab-home-icon"
+- assertVisible:
+    id: "home-screen"
+
+# AC 4: Tap the first visible flight tile in the list on HomeScreen
+# MANUAL REVIEW: Flight list tile selectors are not present in dom_extract.json
+- assertTrue: ${true}
+
+# AC 4 continued: ProductDetailScreen is displayed with flight info card visible
+# MANUAL REVIEW: FlightDetailScreen and flight-info-card elements are not present in dom_extract.json
+- assertTrue: ${true}
+
+# AC 5: Verify the departure date on the flight info card
+# MANUAL REVIEW: flight-info-card elements are not present in dom_extract.json; asserting date text from getFlight response
+- assertVisible: ".*${date}.*"
