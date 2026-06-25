@@ -31,6 +31,7 @@
       },
       "package": "com.abidrazaa.EasyBuy",
       "permissions": [
+        "android.permission.CAMERA",
         "android.permission.RECORD_AUDIO"
       ]
     },
@@ -41,6 +42,12 @@
       "policy": "appVersion"
     },
     "plugins": [
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "EasyBuy needs camera access to scan product barcodes and QR codes."
+        }
+      ],
       [
         "expo-image-picker",
         {

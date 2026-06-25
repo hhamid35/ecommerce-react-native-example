@@ -4,7 +4,7 @@ import SearchableDropdown from "react-native-searchable-dropdown";
 import { colors } from "../../constants";
 import scanIcon from "../../assets/icons/scan_icons.png";
 
-const SearchBar = ({ searchItems, handleProductPress }) => {
+const SearchBar = ({ searchItems, handleProductPress, onScanPress }) => {
   return (
     <View style={styles.searchContainer} testID="search-bar">
       <View style={styles.inputContainer} testID="search-bar-input-container">
@@ -48,7 +48,12 @@ const SearchBar = ({ searchItems, handleProductPress }) => {
         />
       </View>
       <View style={styles.buttonContainer}>
-        <TouchableOpacity style={styles.scanButton} testID="search-bar-scan-btn">
+        <TouchableOpacity
+          style={styles.scanButton}
+          onPress={onScanPress}
+          testID="search-bar-scan-btn"
+          accessibilityLabel="Scan"
+        >
           <Text style={styles.scanButtonText} testID="search-bar-scan-text">Scan</Text>
           <Image source={scanIcon} style={{ width: 20, height: 20 }} testID="search-bar-scan-icon" />
         </TouchableOpacity>

@@ -345,6 +345,38 @@ app.get("/products", (req, res) => {
   res.json({ success: true, data: products });
 });
 
+// GET /products/lookup?code=
+app.get("/products/lookup", (req, res) => {
+  const { code } = req.query;
+  if (!code || String(code).trim() === "") {
+    return res
+      .status(400)
+      .json({ success: false, message: "code query parameter is required" });
+  }
+  if (String(code).length > 256) {
+    return res.status(400).json({
+      success: false,
+      message: "code exceeds maximum length",
+    });
+  }
+  const normalized = String(code).trim().toUpperCase();
+  const matches = products.filter(
+    (p) => (p.sku || "").trim().toUpperCase() === normalized
+  );
+  if (matches.length === 0) {
+    return res.status(404).json({
+      success: false,
+      code: "PRODUCT_NOT_FOUND",
+      message: "No product matches the scanned code",
+      scannedCode: normalized,
+    });
+  }
+  if (matches.length > 1) {
+    console.warn("scan_duplicate_sku", { sku: normalized, matchCount: matches.length });
+  }
+  res.json({ success: true, data: matches[0], matchCount: matches.length });
+});
+
 // POST /product  (admin: add product)
 app.post("/product", adminMiddleware, (req, res) => {
   const { title, sku, price, image, description, category, quantity } = req.body;
@@ -601,6 +633,7 @@ app.listen(PORT, "0.0.0.0", () => {
   console.log(`   POST   /register`);
   console.log(`   POST   /login`);
   console.log(`   GET    /products`);
+  console.log(`   GET    /products/lookup?code=`);
   console.log(`   POST   /product              (admin)`);
   console.log(`   POST   /update-product?id=   (admin)`);
   console.log(`   GET    /delete-product?id=   (admin)`);
