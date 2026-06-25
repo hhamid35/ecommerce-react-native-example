@@ -13,6 +13,10 @@ import CustomAlert from "../../components/CustomAlert/CustomAlert";
 import ProgressDialog from "react-native-progress-dialog";
 import BasicProductList from "../../components/BasicProductList/BasicProductList";
 import StepIndicator from "react-native-step-indicator";
+import {
+  getPaymentMethodLabel,
+  getPaymentStatusLabel,
+} from "../../utils/paymentLabels";
 
 const MyOrderDetailScreen = ({ navigation, route }) => {
   const { orderDetail } = route.params;
@@ -172,6 +176,16 @@ const MyOrderDetailScreen = ({ navigation, route }) => {
               Delivered on {orderDetail?.deliveredOn}
             </Text>
           )}
+          <Text style={styles.secondarytextSm} testID="my-order-detail-payment-method">
+            Payment method: {getPaymentMethodLabel(orderDetail?.payment_type)}
+          </Text>
+          <Text style={styles.secondarytextSm} testID="my-order-detail-payment-status">
+            Payment status:{" "}
+            {getPaymentStatusLabel(
+              orderDetail?.payment_status,
+              orderDetail?.payment_type
+            )}
+          </Text>
           <View style={{ marginTop: 15, width: "100%" }}>
             <StepIndicator
               testID="my-order-detail-step-indicator"

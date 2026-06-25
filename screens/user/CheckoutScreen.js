@@ -18,10 +18,18 @@ import { bindActionCreators } from "redux";
 import * as authStorage from "../../utils/authStorage";
 import CustomInput from "../../components/CustomInput";
 import ProgressDialog from "react-native-progress-dialog";
+import PaymentMethodSelector from "../../components/PaymentMethodSelector";
+import MockCardForm from "../../components/MockCardForm";
+import { PAYMENT_METHOD } from "../../constants/payment";
+
+const simulatePayment = () =>
+  new Promise((resolve) => setTimeout(resolve, 1500));
 
 const CheckoutScreen = ({ navigation, route }) => {
   const [modalVisible, setModalVisible] = useState(false);
+  const [cardModalVisible, setCardModalVisible] = useState(false);
   const [isloading, setIsloading] = useState(false);
+  const [processingLabel, setProcessingLabel] = useState("Placing Order...");
   const cartproduct = useSelector((state) => state.product);
   const dispatch = useDispatch();
   const { emptyCart } = bindActionCreators(actionCreaters, dispatch);
@@ -33,6 +41,30 @@ const CheckoutScreen = ({ navigation, route }) => {
   const [city, setCity] = useState("");
   const [streetAddress, setStreetAddress] = useState("");
   const [zipcode, setZipcode] = useState("");
+  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState(
+    PAYMENT_METHOD.COD
+  );
+  const [cardNumber, setCardNumber] = useState("");
+  const [expiry, setExpiry] = useState("");
+  const [cvv, setCvv] = useState("");
+
+  const addressComplete = country && city && streetAddress != "";
+  const cardFieldsComplete =
+    cardNumber.trim() !== "" && expiry.trim() !== "" && cvv.trim() !== "";
+  const canSubmit =
+    addressComplete &&
+    (selectedPaymentMethod === PAYMENT_METHOD.COD ||
+      (selectedPaymentMethod === PAYMENT_METHOD.CARD && cardFieldsComplete));
+
+  const handlePaymentMethodSelect = (method) => {
+    setSelectedPaymentMethod(method);
+    if (method !== PAYMENT_METHOD.CARD) {
+      setCardModalVisible(false);
+      setCardNumber("");
+      setExpiry("");
+      setCvv("");
+    }
+  };
 
   //method to remove the authUser from aysnc storage and navigate to login
   const logout = async () => {
@@ -42,7 +74,21 @@ const CheckoutScreen = ({ navigation, route }) => {
 
   //method to handle checkout
   const handleCheckout = async () => {
+    if (!canSubmit) {
+      return;
+    }
+
     setIsloading(true);
+    setProcessingLabel(
+      selectedPaymentMethod === PAYMENT_METHOD.CARD
+        ? "Processing payment..."
+        : "Placing Order..."
+    );
+
+    if (selectedPaymentMethod === PAYMENT_METHOD.CARD) {
+      await simulatePayment();
+    }
+
     var myHeaders = new Headers();
     const value = await authStorage.getItem("authUser");
     let user = JSON.parse(value);
@@ -69,7 +115,7 @@ const CheckoutScreen = ({ navigation, route }) => {
       items: payload,
       amount: totalamount,
       discount: 0,
-      payment_type: "cod",
+      payment_type: selectedPaymentMethod,
       country: country,
       status: "pending",
       city: city,
@@ -95,7 +141,11 @@ const CheckoutScreen = ({ navigation, route }) => {
         if (result.success == true) {
           setIsloading(false);
           emptyCart("empty");
-          navigation.replace("orderconfirm");
+          navigation.replace("orderconfirm", {
+            paymentType: result.data.payment_type,
+            paymentStatus: result.data.payment_status,
+            orderId: result.data.orderId,
+          });
         }
       })
       .catch((error) => {
@@ -121,7 +171,7 @@ const CheckoutScreen = ({ navigation, route }) => {
   return (
     <View style={styles.container} testID="checkout-screen">
       <StatusBar testID="checkout-status-bar"></StatusBar>
-      <ProgressDialog visible={isloading} label={"Placing Order..."} />
+      <ProgressDialog visible={isloading} label={processingLabel} />
       <View style={styles.topBarContainer}>
         <TouchableOpacity
           testID="checkout-back-btn"
@@ -212,21 +262,38 @@ const CheckoutScreen = ({ navigation, route }) => {
           </TouchableOpacity>
         </View>
         <Text style={styles.primaryText} testID="checkout-payment-heading">Payment</Text>
-        <View style={styles.listContainer}>
-          <View style={styles.list}>
-            <Text style={styles.secondaryTextSm} testID="checkout-method-label">Method</Text>
-            <Text style={styles.primaryTextSm} testID="checkout-method-value">Cash On Delivery</Text>
+        <PaymentMethodSelector
+          testID="checkout-payment"
+          selectedMethod={selectedPaymentMethod}
+          onSelect={handlePaymentMethodSelect}
+        />
+        {selectedPaymentMethod === PAYMENT_METHOD.CARD && (
+          <View style={styles.listContainer}>
+            <View style={styles.list}>
+              <Text style={styles.secondaryTextSm} testID="checkout-card-summary">
+                {cardFieldsComplete
+                  ? `Card ending ${cardNumber.trim().slice(-4)}`
+                  : "Card details required"}
+              </Text>
+              <TouchableOpacity
+                testID="checkout-enter-card-btn"
+                onPress={() => setCardModalVisible(true)}
+              >
+                <Text style={styles.primaryTextSm}>
+                  {cardFieldsComplete ? "Edit" : "Enter card details"}
+                </Text>
+              </TouchableOpacity>
+            </View>
           </View>
-        </View>
+        )}
 
         <View style={styles.emptyView}></View>
       </ScrollView>
       <View style={styles.buttomContainer}>
-        {country && city && streetAddress != "" ? (
+        {canSubmit ? (
           <CustomButton
             testID="checkout-submit-btn"
             text={"Submit Order"}
-            // onPress={() => navigation.replace("orderconfirm")}
             onPress={() => {
               handleCheckout();
             }}
@@ -292,6 +359,17 @@ const CheckoutScreen = ({ navigation, route }) => {
           </View>
         </View>
       </Modal>
+      <MockCardForm
+        testID="checkout-card-modal"
+        visible={cardModalVisible}
+        cardNumber={cardNumber}
+        setCardNumber={setCardNumber}
+        expiry={expiry}
+        setExpiry={setExpiry}
+        cvv={cvv}
+        setCvv={setCvv}
+        onClose={() => setCardModalVisible(false)}
+      />
     </View>
   );
 };
@@ -367,6 +445,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.white,
     borderRadius: 10,
     padding: 10,
+    marginTop: 5,
   },
   buttomContainer: {
     width: "100%",

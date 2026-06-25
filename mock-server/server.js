@@ -18,6 +18,25 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage });
 
+// ─── Payment helpers ───────────────────────────────────────────────────────────
+
+const VALID_PAYMENT_TYPES = ["cod", "card"];
+
+function derivePaymentStatus(paymentType) {
+  return paymentType === "card" ? "paid" : "pay_on_delivery";
+}
+
+function withPaymentDefaults(order) {
+  const payment_type = VALID_PAYMENT_TYPES.includes(order.payment_type)
+    ? order.payment_type
+    : "cod";
+  const payment_status =
+    order.payment_status === "paid" || order.payment_status === "pay_on_delivery"
+      ? order.payment_status
+      : derivePaymentStatus(payment_type);
+  return { ...order, payment_type, payment_status };
+}
+
 // ─── In-memory data store ──────────────────────────────────────────────────────
 
 let users = [
@@ -239,7 +258,8 @@ let orders = [
     ],
     amount: 24.99,
     discount: 0,
-    payment_type: "cod",
+    payment_type: "card",
+    payment_status: "paid",
     country: "Canada",
     city: "Vancouver",
     zipcode: "V6B 1A1",
@@ -463,7 +483,7 @@ app.get("/dashboard", adminMiddleware, (req, res) => {
 
 // GET /admin/orders  (admin: all orders)
 app.get("/admin/orders", adminMiddleware, (req, res) => {
-  res.json({ success: true, data: orders });
+  res.json({ success: true, data: orders.map(withPaymentDefaults) });
 });
 
 // GET /admin/users  (admin: all users)
@@ -492,7 +512,9 @@ app.get("/admin/order-status", adminMiddleware, (req, res) => {
 
 // GET /orders  (user: their own orders)
 app.get("/orders", authMiddleware, (req, res) => {
-  const userOrders = orders.filter((o) => o.user._id === req.user._id);
+  const userOrders = orders
+    .filter((o) => o.user._id === req.user._id)
+    .map(withPaymentDefaults);
   res.json({ success: true, data: userOrders });
 });
 
@@ -501,6 +523,10 @@ app.post("/checkout", authMiddleware, (req, res) => {
   const { items, amount, discount, payment_type, country, city, zipcode, shippingAddress, status } = req.body;
   if (!items || items.length === 0) {
     return res.status(400).json({ success: false, message: "Cart is empty" });
+  }
+  const resolvedPaymentType = payment_type || "cod";
+  if (!VALID_PAYMENT_TYPES.includes(resolvedPaymentType)) {
+    return res.status(400).json({ success: false, message: "Invalid payment_type" });
   }
   const orderItems = items.map((item) => {
     const product = products.find((p) => p._id === item.productId);
@@ -512,7 +538,7 @@ app.post("/checkout", authMiddleware, (req, res) => {
       quantity: item.quantity,
     };
   });
-  const newOrder = {
+  const newOrder = withPaymentDefaults({
     _id: uuidv4(),
     orderId: `ORD-${Date.now()}`,
     user: {
@@ -523,7 +549,8 @@ app.post("/checkout", authMiddleware, (req, res) => {
     items: orderItems,
     amount: amount || 0,
     discount: discount || 0,
-    payment_type: payment_type || "cod",
+    payment_type: resolvedPaymentType,
+    payment_status: derivePaymentStatus(resolvedPaymentType),
     country: country || "",
     city: city || "",
     zipcode: zipcode || "",
@@ -531,7 +558,8 @@ app.post("/checkout", authMiddleware, (req, res) => {
     status: status || "pending",
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
-  };
+  });
+  console.log("Checkout:", resolvedPaymentType, newOrder.payment_status);
   orders.push(newOrder);
   res.json({ success: true, message: "Order placed successfully", data: newOrder });
 });
