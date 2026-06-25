@@ -84,9 +84,113 @@ jobs:
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
 
-      - name: Build Android apps
+      - name: Build Android app
         id: build
         run: |
-          eas build --platform android --profile staging --non-interactive --json
+          echo "Starting EAS build: eas build --platform android --profile staging --non-interactive --json"
+          BUILD_OUTPUT_FILE="eas-build-output.json"
+
+          # With --json the structured result goes to stdout while progress logs go to stderr,
+          # so redirecting stdout captures clean JSON we can both archive and parse.
+          eas build --platform android --profile staging --non-interactive --json > "$BUILD_OUTPUT_FILE" || {
+            echo "EAS build command failed. Captured output:"
+            cat "$BUILD_OUTPUT_FILE" || true
+            exit 1
+          }
+
+          echo "Raw EAS build output:"
+          cat "$BUILD_OUTPUT_FILE"
+          echo ""
+
+          # eas build --json returns an array of build objects.
+          if jq '.' "$BUILD_OUTPUT_FILE" > /dev/null 2>&1; then
+            APP_VERSION=$(jq -r '.[0].appVersion // "unknown"' "$BUILD_OUTPUT_FILE")
+            BUILD_VERSION=$(jq -r '.[0].appBuildVersion // "unknown"' "$BUILD_OUTPUT_FILE")
+            BUILD_ID=$(jq -r '.[0].id // "unknown"' "$BUILD_OUTPUT_FILE")
+            # Prefer the direct application archive URL, fall back to the build page artifact URL.
+            BUILD_URL=$(jq -r '.[0].artifacts.applicationArchiveUrl // .[0].artifacts.buildUrl // ""' "$BUILD_OUTPUT_FILE")
+          else
+            echo "Warning: EAS build output is not valid JSON; cannot parse artifact URL."
+            APP_VERSION="unknown"; BUILD_VERSION="unknown"; BUILD_ID="unknown"; BUILD_URL=""
+          fi
+
+          echo "App version : $APP_VERSION"
+          echo "Build number: $BUILD_VERSION"
+          echo "Build ID    : $BUILD_ID"
+          echo "Artifact URL: $BUILD_URL"
+
+          {
+            echo "app_version=$APP_VERSION"
+            echo "build_version=$BUILD_VERSION"
+            echo "build_id=$BUILD_ID"
+            echo "build_url=$BUILD_URL"
+          } >> "$GITHUB_OUTPUT"
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Download Android build artifact (.apk)
+        id: download
+        if: steps.build.outputs.build_url != ''
+        run: |
+          BUILD_URL="${{ steps.build.outputs.build_url }}"
+          APP_VERSION="${{ steps.build.outputs.app_version }}"
+          BUILD_VERSION="${{ steps.build.outputs.build_version }}"
+
+          mkdir -p build-artifacts
+
+          # Descriptive name, e.g. EasyBuy_staging_1_0_0_42.apk
+          VERSION_UNDERSCORE=$(echo "$APP_VERSION" | tr '.' '_')
+          APK_FILENAME="EasyBuy_staging_${VERSION_UNDERSCORE}_${BUILD_VERSION}.apk"
+          APK_FILE="build-artifacts/${APK_FILENAME}"
+
+          echo "Downloading build artifact from: $BUILD_URL"
+          curl -fL "$BUILD_URL" -o "$APK_FILE" || {
+            echo "Failed to download build artifact from $BUILD_URL"
+            exit 1
+          }
+
+          echo "Downloaded $APK_FILE ($(du -h "$APK_FILE" | cut -f1))"
+          echo "apk_file=$APK_FILE" >> "$GITHUB_OUTPUT"
+
+      - name: Export resolved app/EAS configuration
+        id: config
+        if: always()
+        run: |
+          echo "Exporting configuration: eas config --platform android --profile staging --non-interactive --json"
+          # Combines app.json (Expo config) and eas.json (build profile) into one resolved JSON document.
+          eas config --platform android --profile staging --non-interactive --json > eas-config.json || {
+            echo "eas config command failed. Captured output:"
+            cat eas-config.json || true
+            exit 1
+          }
+          echo "Resolved configuration:"
+          cat eas-config.json
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Upload EAS build output (JSON)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: eas-build-output
+          path: eas-build-output.json
+          retention-days: 90
+          if-no-files-found: warn
+
+      - name: Upload Android build (.apk)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-staging-apk
+          path: build-artifacts/*.apk
+          retention-days: 90
+          if-no-files-found: warn
+
+      - name: Upload resolved app/EAS configuration (JSON)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: eas-app-config
+          path: eas-config.json
+          retention-days: 90
+          if-no-files-found: warn
