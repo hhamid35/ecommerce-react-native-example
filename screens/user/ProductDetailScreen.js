@@ -5,6 +5,7 @@ import {
   View,
   StatusBar,
   Text,
+  ScrollView,
 } from "react-native";
 import React, { useState, useEffect } from "react";
 import { Ionicons } from "@expo/vector-icons";
@@ -16,6 +17,9 @@ import { bindActionCreators } from "redux";
 import * as actionCreaters from "../../states/actionCreaters/actionCreaters";
 import * as authStorage from "../../utils/authStorage";
 import CustomAlert from "../../components/CustomAlert/CustomAlert";
+import ReviewSummary from "../../components/ReviewSummary";
+import ReviewList from "../../components/ReviewList";
+import { getProductReviews, getEligibility } from "../../services/reviews";
 
 const ProductDetailScreen = ({ navigation, route }) => {
   const { product } = route.params;
@@ -43,6 +47,11 @@ const ProductDetailScreen = ({ navigation, route }) => {
   const [error, setError] = useState("");
   const [isDisable, setIsDisbale] = useState(true);
   const [alertType, setAlertType] = useState("error");
+  const [reviewSummary, setReviewSummary] = useState(null);
+  const [reviews, setReviews] = useState([]);
+  const [eligibility, setEligibility] = useState(null);
+  const [reviewsLoading, setReviewsLoading] = useState(false);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
 
   //method to fetch wishlist from server using API call
   const fetchWishlist = async () => {
@@ -178,12 +187,95 @@ const ProductDetailScreen = ({ navigation, route }) => {
     }
   };
 
+  //fetch reviews and eligibility
+  const fetchReviews = async (token) => {
+    setReviewsLoading(true);
+    try {
+      const { ok, result } = await getProductReviews(product._id, { token });
+      if (ok && result.success) {
+        setReviewSummary(result.data.summary);
+        setReviews(result.data.reviews);
+      }
+    } catch (err) {
+      console.log("error fetching reviews", err);
+    }
+    setReviewsLoading(false);
+  };
+
+  const fetchEligibility = async (token) => {
+    try {
+      const { ok, result } = await getEligibility(product._id, token);
+      if (ok && result.success) {
+        setEligibility(result.data);
+      }
+    } catch (err) {
+      console.log("error fetching eligibility", err);
+    }
+  };
+
+  const navigateToWriteReview = () => {
+    navigation.navigate("writereview", {
+      product,
+      existingReview: eligibility?.existingReview || null,
+    });
+  };
+
+  const renderReviewCTA = () => {
+    if (!isLoggedIn) {
+      return (
+        <TouchableOpacity
+          onPress={() => navigation.navigate("login")}
+          testID="product-detail-sign-in-review"
+        >
+          <Text style={styles.signInText}>Sign in to review</Text>
+        </TouchableOpacity>
+      );
+    }
+    if (eligibility?.existingReview) {
+      return (
+        <CustomButton
+          text="Edit Your Review"
+          onPress={navigateToWriteReview}
+          testID="product-detail-edit-review-btn"
+        />
+      );
+    }
+    if (eligibility?.eligible) {
+      return (
+        <CustomButton
+          text="Write a Review"
+          onPress={navigateToWriteReview}
+          testID="product-detail-write-review-btn"
+        />
+      );
+    }
+    return (
+      <Text style={styles.ineligibleText} testID="product-detail-ineligible-text">
+        Only verified purchasers can review this product.
+      </Text>
+    );
+  };
+
   //set quantity, avaiableQuantity, product image and fetch wishlist on initial render
   useEffect(() => {
     setQuantity(0);
     setAvaiableQuantity(product.quantity);
     SetProductImage(`${network.serverip}/uploads/${product?.image}`);
     fetchWishlist();
+
+    const loadReviews = async () => {
+      const value = await authStorage.getItem("authUser");
+      if (value) {
+        const user = JSON.parse(value);
+        setIsLoggedIn(true);
+        fetchReviews(user.token);
+        fetchEligibility(user.token);
+      } else {
+        setIsLoggedIn(false);
+        fetchReviews();
+      }
+    };
+    loadReviews();
   }, []);
 
   //render whenever the value of wishlistItems change
@@ -222,7 +314,11 @@ const ProductDetailScreen = ({ navigation, route }) => {
           <Image source={cartIcon} testID="product-detail-cart-icon" />
         </TouchableOpacity>
       </View>
-      <View style={styles.bodyContainer}>
+      <ScrollView
+        style={styles.bodyContainer}
+        keyboardShouldPersistTaps="handled"
+        testID="product-detail-scroll"
+      >
         <View style={styles.productImageContainer}>
           <Image source={{ uri: productImage }} style={styles.productImage} testID="product-detail-image" />
         </View>
@@ -260,6 +356,20 @@ const ProductDetailScreen = ({ navigation, route }) => {
             <View style={styles.productDescriptionContainer}>
               <Text style={styles.secondaryTextSm} testID="product-detail-description-label">Description:</Text>
               <Text testID="product-detail-description">{product?.description}</Text>
+            </View>
+            <View style={styles.reviewsSection} testID="product-detail-reviews-section">
+              <Text style={styles.reviewsSectionTitle} testID="product-detail-reviews-heading">
+                Customer Reviews
+              </Text>
+              {reviewsLoading ? (
+                <Text style={styles.reviewsLoadingText}>Loading reviews...</Text>
+              ) : (
+                <>
+                  <ReviewSummary summary={reviewSummary} testID="review-summary" />
+                  <View style={styles.reviewCTAContainer}>{renderReviewCTA()}</View>
+                  <ReviewList reviews={reviews} testID="review-list" />
+                </>
+              )}
             </View>
           </View>
           <View style={styles.productInfoBottomContainer}>
@@ -301,7 +411,7 @@ const ProductDetailScreen = ({ navigation, route }) => {
             </View>
           </View>
         </View>
-      </View>
+      </ScrollView>
     </View>
   );
 };
@@ -518,5 +628,39 @@ const styles = StyleSheet.create({
     color: colors.white,
     fontWeight: "bold",
     fontSize: 10,
+  },
+  reviewsSection: {
+    width: "100%",
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    paddingBottom: 10,
+  },
+  reviewsSectionTitle: {
+    fontSize: 18,
+    fontWeight: "bold",
+    color: colors.dark,
+    marginBottom: 10,
+  },
+  reviewsLoadingText: {
+    color: colors.muted,
+    fontSize: 14,
+    fontStyle: "italic",
+  },
+  reviewCTAContainer: {
+    width: "100%",
+    marginVertical: 10,
+  },
+  signInText: {
+    color: colors.primary,
+    fontSize: 14,
+    textAlign: "center",
+    paddingVertical: 10,
+  },
+  ineligibleText: {
+    color: colors.muted,
+    fontSize: 13,
+    fontStyle: "italic",
+    textAlign: "center",
+    paddingVertical: 10,
   },
 });

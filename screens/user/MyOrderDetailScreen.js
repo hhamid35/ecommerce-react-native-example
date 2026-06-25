@@ -13,6 +13,8 @@ import CustomAlert from "../../components/CustomAlert/CustomAlert";
 import ProgressDialog from "react-native-progress-dialog";
 import BasicProductList from "../../components/BasicProductList/BasicProductList";
 import StepIndicator from "react-native-step-indicator";
+import * as authStorage from "../../utils/authStorage";
+import { getEligibility } from "../../services/reviews";
 
 const MyOrderDetailScreen = ({ navigation, route }) => {
   const { orderDetail } = route.params;
@@ -26,6 +28,7 @@ const MyOrderDetailScreen = ({ navigation, route }) => {
   const [statusDisable, setStatusDisable] = useState(false);
   const labels = ["Processing", "Shipping", "Delivery"];
   const [trackingState, setTrackingState] = useState(1);
+  const [reviewEligibility, setReviewEligibility] = useState({});
   const customStyles = {
     stepIndicatorSize: 25,
     currentStepIndicatorSize: 30,
@@ -107,7 +110,42 @@ const MyOrderDetailScreen = ({ navigation, route }) => {
     } else {
       setTrackingState(3);
     }
+
+    if (orderDetail?.status === "delivered") {
+      const loadEligibility = async () => {
+        const value = await authStorage.getItem("authUser");
+        if (!value) return;
+        const user = JSON.parse(value);
+        const eligibilityMap = {};
+        for (const item of orderDetail.items) {
+          const productId = item.productId._id;
+          try {
+            const { ok, result } = await getEligibility(productId, user.token);
+            if (ok && result.success) {
+              eligibilityMap[productId] = result.data;
+            }
+          } catch (err) {
+            console.log("eligibility error", err);
+          }
+        }
+        setReviewEligibility(eligibilityMap);
+      };
+      loadEligibility();
+    }
   }, []);
+
+  const handleReviewPress = (item) => {
+    const productId = item.productId._id;
+    const eligibility = reviewEligibility[productId];
+    navigation.navigate("writereview", {
+      product: {
+        _id: productId,
+        title: item.productId.title,
+        price: item.price,
+      },
+      existingReview: eligibility?.existingReview || null,
+    });
+  };
 
   return (
     <View style={styles.container} testID="my-order-detail-screen">
@@ -211,6 +249,20 @@ const MyOrderDetailScreen = ({ navigation, route }) => {
                   price={product?.price}
                   quantity={product?.quantity}
                 />
+                {orderDetail?.status === "delivered" &&
+                  reviewEligibility[product?.productId?._id]?.eligible && (
+                    <TouchableOpacity
+                      style={styles.reviewButton}
+                      onPress={() => handleReviewPress(product)}
+                      testID={`my-order-detail-review-btn-${index}`}
+                    >
+                      <Text style={styles.reviewButtonText}>
+                        {reviewEligibility[product.productId._id]?.existingReview
+                          ? "Edit Review"
+                          : "Review Product"}
+                      </Text>
+                    </TouchableOpacity>
+                  )}
               </View>
             ))}
           </ScrollView>
@@ -367,5 +419,16 @@ const styles = StyleSheet.create({
   },
   emptyView: {
     height: 20,
+  },
+  reviewButton: {
+    alignSelf: "flex-end",
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    marginBottom: 8,
+  },
+  reviewButtonText: {
+    color: colors.primary,
+    fontSize: 13,
+    fontWeight: "600",
   },
 });

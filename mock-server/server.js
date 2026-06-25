@@ -7,6 +7,13 @@ const {
   normalizeLookupCode,
   resolveProductByCode,
 } = require("./productLookup");
+const {
+  isVerifiedPurchaser,
+  findActiveReview,
+  computeSummary,
+  toPublicReview,
+  toAuthorReview,
+} = require("./reviewHelpers");
 
 const app = express();
 const PORT = 3002;
@@ -294,6 +301,45 @@ let orders = [
   },
 ];
 
+let reviews = [
+  {
+    _id: "rev-seed-001",
+    productId: "prod007",
+    userId: "user001",
+    user: { _id: "user001", name: "John Doe" },
+    rating: 5,
+    text: "Great rice! Aromatic and cooks perfectly every time.",
+    verifiedPurchase: true,
+    visibility: "published",
+    createdAt: "2024-02-01T10:00:00.000Z",
+    updatedAt: "2024-02-01T10:00:00.000Z",
+  },
+  {
+    _id: "rev-seed-002",
+    productId: "prod005",
+    userId: "user002",
+    user: { _id: "user002", name: "Jane Smith" },
+    rating: 4,
+    text: "Good moisturizer, absorbs quickly.",
+    verifiedPurchase: true,
+    visibility: "published",
+    createdAt: "2024-02-02T14:30:00.000Z",
+    updatedAt: "2024-02-02T14:30:00.000Z",
+  },
+  {
+    _id: "rev-seed-003",
+    productId: "prod001",
+    userId: "user001",
+    user: { _id: "user001", name: "John Doe" },
+    rating: 3,
+    text: "Decent shirt but runs a bit small.",
+    verifiedPurchase: true,
+    visibility: "hidden",
+    createdAt: "2024-02-03T09:15:00.000Z",
+    updatedAt: "2024-02-03T09:15:00.000Z",
+  },
+];
+
 // ─── Auth middleware (simple token check) ─────────────────────────────────────
 const authMiddleware = (req, res, next) => {
   const token = req.headers["x-auth-token"];
@@ -509,6 +555,7 @@ app.get("/dashboard", adminMiddleware, (req, res) => {
       ordersCount: orders.length,
       productsCount: products.length,
       categoriesCount: categories.length,
+      reviewsCount: reviews.filter((r) => r.visibility !== "removed").length,
     },
   });
 });
@@ -615,6 +662,269 @@ app.post("/reset-password", (req, res) => {
   res.json({ success: true, message: "Password updated successfully" });
 });
 
+// GET /products/:productId/reviews  (public)
+app.get("/products/:productId/reviews", (req, res) => {
+  const { productId } = req.params;
+  const product = products.find((p) => p._id === productId);
+  if (!product) {
+    return res.status(404).json({ success: false, message: "Product not found" });
+  }
+
+  let limit = parseInt(req.query.limit, 10) || 10;
+  if (limit > 50) limit = 50;
+  if (limit < 1) limit = 10;
+
+  const summary = computeSummary(productId, reviews);
+  let publishedReviews = reviews
+    .filter((r) => r.productId === productId && r.visibility === "published")
+    .sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt))
+    .slice(0, limit)
+    .map(toPublicReview);
+
+  const token = req.headers["x-auth-token"];
+  if (token) {
+    const user = users.find((u) => u.token === token);
+    if (user) {
+      const hiddenReview = reviews.find(
+        (r) =>
+          r.productId === productId &&
+          r.userId === user._id &&
+          r.visibility === "hidden"
+      );
+      if (hiddenReview) {
+        publishedReviews = [...publishedReviews, toAuthorReview(hiddenReview)];
+      }
+    }
+  }
+
+  res.json({
+    success: true,
+    data: { summary, reviews: publishedReviews },
+  });
+});
+
+// GET /products/:productId/reviews/eligibility  (auth required)
+app.get("/products/:productId/reviews/eligibility", authMiddleware, (req, res) => {
+  const { productId } = req.params;
+  const product = products.find((p) => p._id === productId);
+  if (!product) {
+    return res.status(200).json({
+      success: true,
+      data: { eligible: false, reason: "product_not_found", existingReview: null },
+    });
+  }
+
+  const activeReview = findActiveReview(req.user._id, productId, reviews);
+  if (activeReview) {
+    return res.json({
+      success: true,
+      data: {
+        eligible: true,
+        reason: null,
+        existingReview: toAuthorReview(activeReview),
+      },
+    });
+  }
+
+  const eligible = isVerifiedPurchaser(req.user._id, productId, orders);
+  if (!eligible) {
+    console.log(
+      JSON.stringify({
+        event: "review_eligibility_denied",
+        userId: req.user._id,
+        productId,
+        reason: "not_verified_purchaser",
+      })
+    );
+    return res.json({
+      success: true,
+      data: {
+        eligible: false,
+        reason: "not_verified_purchaser",
+        existingReview: null,
+      },
+    });
+  }
+
+  res.json({
+    success: true,
+    data: { eligible: true, reason: null, existingReview: null },
+  });
+});
+
+// POST /products/:productId/reviews  (auth required)
+app.post("/products/:productId/reviews", authMiddleware, (req, res) => {
+  const { productId } = req.params;
+  const product = products.find((p) => p._id === productId);
+  if (!product) {
+    return res.status(404).json({ success: false, message: "Product not found" });
+  }
+
+  const { rating, text } = req.body;
+  const ratingNum = parseInt(rating, 10);
+  if (!ratingNum || ratingNum < 1 || ratingNum > 5) {
+    return res.status(400).json({ success: false, message: "Invalid rating" });
+  }
+  const reviewText = text ? String(text).trim().substring(0, 500) : "";
+
+  if (!isVerifiedPurchaser(req.user._id, productId, orders)) {
+    console.log(
+      JSON.stringify({
+        event: "review_eligibility_denied",
+        userId: req.user._id,
+        productId,
+        reason: "not_verified_purchaser",
+      })
+    );
+    return res.status(403).json({
+      success: false,
+      message: "Only verified purchasers can review this product",
+    });
+  }
+
+  const existing = findActiveReview(req.user._id, productId, reviews);
+  if (existing) {
+    return res.status(409).json({
+      success: false,
+      message: "Review already exists; use PUT to update",
+    });
+  }
+
+  const now = new Date().toISOString();
+  const newReview = {
+    _id: uuidv4(),
+    productId,
+    userId: req.user._id,
+    user: { _id: req.user._id, name: req.user.name },
+    rating: ratingNum,
+    text: reviewText,
+    verifiedPurchase: true,
+    visibility: "published",
+    createdAt: now,
+    updatedAt: now,
+  };
+  reviews.push(newReview);
+
+  console.log(
+    JSON.stringify({
+      event: "review_created",
+      reviewId: newReview._id,
+      userId: req.user._id,
+      productId,
+      rating: ratingNum,
+    })
+  );
+
+  res.status(201).json({
+    success: true,
+    message: "Review submitted",
+    data: newReview,
+  });
+});
+
+// PUT /products/:productId/reviews  (auth required)
+app.put("/products/:productId/reviews", authMiddleware, (req, res) => {
+  const { productId } = req.params;
+  const existing = findActiveReview(req.user._id, productId, reviews);
+  if (!existing) {
+    return res.status(404).json({ success: false, message: "No active review to update" });
+  }
+  if (existing.userId !== req.user._id) {
+    return res.status(403).json({ success: false, message: "Not authorized to update this review" });
+  }
+
+  const { rating, text } = req.body;
+  const ratingNum = parseInt(rating, 10);
+  if (!ratingNum || ratingNum < 1 || ratingNum > 5) {
+    return res.status(400).json({ success: false, message: "Invalid rating" });
+  }
+
+  existing.rating = ratingNum;
+  existing.text = text ? String(text).trim().substring(0, 500) : "";
+  existing.updatedAt = new Date().toISOString();
+
+  console.log(
+    JSON.stringify({
+      event: "review_updated",
+      reviewId: existing._id,
+      userId: req.user._id,
+      productId,
+      rating: ratingNum,
+    })
+  );
+
+  res.json({
+    success: true,
+    message: "Review updated",
+    data: existing,
+  });
+});
+
+// GET /admin/reviews  (admin)
+app.get("/admin/reviews", adminMiddleware, (req, res) => {
+  const { productId, visibility } = req.query;
+  let filtered = [...reviews];
+  if (productId) {
+    filtered = filtered.filter((r) => r.productId === productId);
+  }
+  if (visibility) {
+    filtered = filtered.filter((r) => r.visibility === visibility);
+  }
+
+  const data = filtered
+    .sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt))
+    .map((review) => {
+      const product = products.find((p) => p._id === review.productId);
+      return {
+        _id: review._id,
+        productId: review.productId,
+        productTitle: product ? product.title : "Unknown Product",
+        user: review.user,
+        rating: review.rating,
+        text: review.text,
+        verifiedPurchase: review.verifiedPurchase,
+        visibility: review.visibility,
+        createdAt: review.createdAt,
+        updatedAt: review.updatedAt,
+      };
+    });
+
+  res.json({ success: true, data });
+});
+
+// PATCH /admin/reviews/:reviewId/visibility  (admin)
+app.patch("/admin/reviews/:reviewId/visibility", adminMiddleware, (req, res) => {
+  const { reviewId } = req.params;
+  const { visibility } = req.body;
+  const validVisibilities = ["published", "hidden", "removed"];
+  if (!validVisibilities.includes(visibility)) {
+    return res.status(400).json({ success: false, message: "Invalid visibility" });
+  }
+
+  const review = reviews.find((r) => r._id === reviewId);
+  if (!review) {
+    return res.status(404).json({ success: false, message: "Review not found" });
+  }
+
+  review.visibility = visibility;
+  review.updatedAt = new Date().toISOString();
+
+  console.log(
+    JSON.stringify({
+      event: "review_visibility_changed",
+      reviewId: review._id,
+      adminId: req.user._id,
+      visibility,
+    })
+  );
+
+  res.json({
+    success: true,
+    message: `Review visibility updated to ${visibility}`,
+    data: review,
+  });
+});
+
 // POST /photos/upload
 app.post("/photos/upload", upload.single("photos"), (req, res) => {
   if (!req.file) {
@@ -669,6 +979,12 @@ app.listen(PORT, "0.0.0.0", () => {
   console.log(`   POST   /checkout             (user)`);
   console.log(`   GET    /delete-user?id=`);
   console.log(`   POST   /reset-password?id=`);
+  console.log(`   GET    /products/:productId/reviews`);
+  console.log(`   GET    /products/:productId/reviews/eligibility`);
+  console.log(`   POST   /products/:productId/reviews`);
+  console.log(`   PUT    /products/:productId/reviews`);
+  console.log(`   GET    /admin/reviews            (admin)`);
+  console.log(`   PATCH  /admin/reviews/:reviewId/visibility  (admin)`);
   console.log(`   POST   /photos/upload`);
   console.log(`   GET    /uploads/:filename`);
   console.log(`\n🔑 Test tokens:`);
