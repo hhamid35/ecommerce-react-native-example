@@ -345,6 +345,27 @@ app.get("/products", (req, res) => {
   res.json({ success: true, data: products });
 });
 
+function normalizeLookupCode(code) {
+  return (code || "").trim().toLowerCase();
+}
+
+// GET /products/lookup?code=
+app.get("/products/lookup", (req, res) => {
+  const rawCode = req.query.code;
+  if (!rawCode || !String(rawCode).trim()) {
+    return res.status(400).json({ success: false, message: "Code parameter is required" });
+  }
+  const normalized = normalizeLookupCode(rawCode);
+  const matches = products.filter((p) => normalizeLookupCode(p.sku) === normalized);
+  if (matches.length === 0) {
+    return res.status(404).json({ success: false, message: "No product found for this code" });
+  }
+  if (matches.length > 1) {
+    console.warn(`[lookup] duplicate SKU match for code=${rawCode}, returning first of ${matches.length}`);
+  }
+  return res.json({ success: true, data: matches[0] });
+});
+
 // POST /product  (admin: add product)
 app.post("/product", adminMiddleware, (req, res) => {
   const { title, sku, price, image, description, category, quantity } = req.body;
@@ -601,6 +622,7 @@ app.listen(PORT, "0.0.0.0", () => {
   console.log(`   POST   /register`);
   console.log(`   POST   /login`);
   console.log(`   GET    /products`);
+  console.log(`   GET    /products/lookup?code=`);
   console.log(`   POST   /product              (admin)`);
   console.log(`   POST   /update-product?id=   (admin)`);
   console.log(`   GET    /delete-product?id=   (admin)`);

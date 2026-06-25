@@ -98,6 +98,7 @@ const HomeScreen = ({ navigation, route }) => {
         <SearchBar
           searchItems={searchItems}
           handleProductPress={handleProductPress}
+          onScanPress={() => navigation.navigate("scan")}
         />
         <ScrollView nestedScrollEnabled={true} testID="home-scroll">
           <PromotionSlider slides={slides} />
