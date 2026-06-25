@@ -8,7 +8,7 @@ import {
   ScrollView,
 } from "react-native";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { colors, network } from "../../constants";
 import CustomInput from "../../components/CustomInput";
 import header_logo from "../../assets/logo/logo.png";
@@ -28,6 +28,12 @@ const LoginScreen = ({ navigation, route }) => {
       : ""
   );
   const [isloading, setIsloading] = useState(false);
+
+  useEffect(() => {
+    if (route.params?.recoverySuccess) {
+      navigation.setParams({ recoverySuccess: undefined });
+    }
+  }, [navigation, route.params?.recoverySuccess]);
 
   const _storeData = async (user) => {
     try {

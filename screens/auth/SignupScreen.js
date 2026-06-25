@@ -16,6 +16,7 @@ import CustomButton from "../../components/CustomButton";
 import { Ionicons } from "@expo/vector-icons";
 import CustomAlert from "../../components/CustomAlert/CustomAlert";
 import ConnectionAlert from "../../components/ConnectionAlert/ConnectionAlert";
+import { validateEmail, validatePasswordPair } from "../../utils/passwordValidation";
 
 const SignupScreen = ({ navigation }) => {
   const [email, setEmail] = useState("");
@@ -43,26 +44,16 @@ const SignupScreen = ({ navigation }) => {
 
   //method to post the user data to server for user signup using API call
   const signUpHandle = () => {
-    if (email == "") {
-      return setError("Please enter your email");
+    const emailValidation = validateEmail(email);
+    if (!emailValidation.valid) {
+      return setError(emailValidation.error);
     }
     if (name == "") {
       return setError("Please enter your name");
     }
-    if (password == "") {
-      return setError("Please enter your password");
-    }
-    if (!email.includes("@")) {
-      return setError("Email is not valid");
-    }
-    if (email.length < 6) {
-      return setError("Email is too short");
-    }
-    if (password.length < 5) {
-      return setError("Password must be 6 characters long");
-    }
-    if (password != confirmPassword) {
-      return setError("password does not match");
+    const passwordValidation = validatePasswordPair(password, confirmPassword);
+    if (!passwordValidation.valid) {
+      return setError(passwordValidation.error);
     }
     fetch(network.serverip + "/register", requestOptions) // API call
       .then((response) => response.json())

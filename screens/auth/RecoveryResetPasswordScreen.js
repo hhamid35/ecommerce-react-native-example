@@ -1,13 +1,15 @@
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Ionicons } from "@expo/vector-icons";
-import { colors, network } from "../../constants";
+import { colors } from "../../constants";
 import CustomInput from "../../components/CustomInput";
 import CustomButton from "../../components/CustomButton";
 import CustomAlert from "../../components/CustomAlert/CustomAlert";
 import ConnectionAlert from "../../components/ConnectionAlert/ConnectionAlert";
 import ProgressDialog from "react-native-progress-dialog";
+import RecoveryStepIndicator from "../../components/RecoveryStepIndicator";
 import { validatePasswordPair } from "../../utils/passwordValidation";
+import { resetPasswordWithToken } from "../../services/passwordRecoveryApi";
 
 const RecoveryResetPasswordScreen = ({ navigation, route }) => {
   const { email, resetToken } = route.params || {};
@@ -17,7 +19,13 @@ const RecoveryResetPasswordScreen = ({ navigation, route }) => {
   const [alertType, setAlertType] = useState("error");
   const [isLoading, setIsLoading] = useState(false);
 
-  const resetHandle = () => {
+  useEffect(() => {
+    if (!email || !resetToken) {
+      navigation.replace("forgetpassword");
+    }
+  }, [email, resetToken, navigation]);
+
+  const resetHandle = async () => {
     const validation = validatePasswordPair(newPassword, confirmPassword);
     if (!validation.valid) {
       setAlertType("error");
@@ -27,42 +35,32 @@ const RecoveryResetPasswordScreen = ({ navigation, route }) => {
     setError("");
     setIsLoading(true);
 
-    const myHeaders = new Headers();
-    myHeaders.append("Content-Type", "application/json");
+    const { ok, message } = await resetPasswordWithToken({
+      email,
+      resetToken,
+      newPassword,
+      confirmPassword,
+    });
+    setIsLoading(false);
 
-    fetch(network.serverip + "/password-recovery/reset", {
-      method: "POST",
-      headers: myHeaders,
-      body: JSON.stringify({
-        email,
-        resetToken,
-        newPassword,
-        confirmPassword,
-      }),
-    })
-      .then((response) => response.json().then((result) => ({ status: response.status, result })))
-      .then(({ result }) => {
-        setIsLoading(false);
-        if (!result.success) {
-          setAlertType("error");
-          return setError(result.message || "Recovery session expired. Please start again.");
-        }
-        setAlertType("success");
-        setError("Password reset successfully.");
-        setTimeout(() => {
-          navigation.reset({
-            index: 0,
-            routes: [{ name: "login", params: { recoverySuccess: true } }],
-          });
-        }, 2000);
-      })
-      .catch((fetchError) => {
-        setIsLoading(false);
-        setAlertType("error");
-        console.log("error", fetchError);
-        setError(fetchError.message || "Network error");
+    if (!ok) {
+      setAlertType("error");
+      return setError(message);
+    }
+
+    setAlertType("success");
+    setError("Password reset successfully.");
+    setTimeout(() => {
+      navigation.reset({
+        index: 0,
+        routes: [{ name: "login", params: { recoverySuccess: true } }],
       });
+    }, 2000);
   };
+
+  if (!email || !resetToken) {
+    return null;
+  }
 
   return (
     <ConnectionAlert onChange={() => {}}>
@@ -80,6 +78,7 @@ const RecoveryResetPasswordScreen = ({ navigation, route }) => {
             />
           </TouchableOpacity>
         </View>
+        <RecoveryStepIndicator currentStep={2} />
         <View style={styles.screenNameContainer}>
           <Text style={styles.screenNameText} testID="recovery-reset-password-heading">
             Create New Password

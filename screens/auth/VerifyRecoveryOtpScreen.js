@@ -1,12 +1,17 @@
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import React, { useEffect, useState } from "react";
 import { Ionicons } from "@expo/vector-icons";
-import { colors, network } from "../../constants";
+import { colors } from "../../constants";
 import CustomInput from "../../components/CustomInput";
 import CustomButton from "../../components/CustomButton";
 import CustomAlert from "../../components/CustomAlert/CustomAlert";
 import ConnectionAlert from "../../components/ConnectionAlert/ConnectionAlert";
 import ProgressDialog from "react-native-progress-dialog";
+import RecoveryStepIndicator from "../../components/RecoveryStepIndicator";
+import {
+  requestRecoveryCode,
+  verifyRecoveryCode,
+} from "../../services/passwordRecoveryApi";
 
 const RESEND_COOLDOWN_SEC = 60;
 
@@ -26,6 +31,13 @@ const VerifyRecoveryOtpScreen = ({ navigation, route }) => {
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [resendCooldown, setResendCooldown] = useState(RESEND_COOLDOWN_SEC);
+  const [otpInputDisabled, setOtpInputDisabled] = useState(false);
+
+  useEffect(() => {
+    if (!email) {
+      navigation.replace("forgetpassword");
+    }
+  }, [email, navigation]);
 
   useEffect(() => {
     if (resendCooldown <= 0) {
@@ -35,7 +47,10 @@ const VerifyRecoveryOtpScreen = ({ navigation, route }) => {
     return () => clearTimeout(timer);
   }, [resendCooldown]);
 
-  const verifyHandle = () => {
+  const verifyHandle = async () => {
+    if (otpInputDisabled) {
+      return;
+    }
     if (!otp || otp.length !== 6) {
       return setError("Please enter the 6-digit code");
     }
@@ -43,68 +58,48 @@ const VerifyRecoveryOtpScreen = ({ navigation, route }) => {
     setError("");
     setIsLoading(true);
 
-    const myHeaders = new Headers();
-    myHeaders.append("Content-Type", "application/json");
+    const { ok, status, message, data } = await verifyRecoveryCode(email, otp);
+    setIsLoading(false);
 
-    fetch(network.serverip + "/password-recovery/verify", {
-      method: "POST",
-      headers: myHeaders,
-      body: JSON.stringify({ email, otp }),
-    })
-      .then((response) => response.json().then((result) => ({ status: response.status, result })))
-      .then(({ status, result }) => {
-        setIsLoading(false);
-        if (!result.success) {
-          return setError(result.message || "Invalid or expired code. Request a new one.");
-        }
-        if (status === 429) {
-          return setError(result.message || "Too many attempts. Request a new code.");
-        }
-        navigation.navigate("recoveryresetpassword", {
-          email,
-          resetToken: result.data.resetToken,
-        });
-      })
-      .catch((fetchError) => {
-        setIsLoading(false);
-        console.log("error", fetchError);
-        setError(fetchError.message || "Network error");
-      });
+    if (status === 429) {
+      setOtpInputDisabled(true);
+      return setError(message || "Too many attempts. Request a new code.");
+    }
+    if (!ok) {
+      return setError(message);
+    }
+
+    navigation.navigate("recoveryresetpassword", {
+      email,
+      resetToken: data.resetToken,
+    });
   };
 
-  const resendHandle = () => {
+  const resendHandle = async () => {
     if (resendCooldown > 0) {
       return;
     }
 
     setError("");
+    setOtpInputDisabled(false);
     setIsLoading(true);
 
-    const myHeaders = new Headers();
-    myHeaders.append("Content-Type", "application/json");
+    const { ok, status, message, data } = await requestRecoveryCode(email);
+    setIsLoading(false);
 
-    fetch(network.serverip + "/password-recovery/request", {
-      method: "POST",
-      headers: myHeaders,
-      body: JSON.stringify({ email }),
-    })
-      .then((response) => response.json().then((result) => ({ status: response.status, result })))
-      .then(({ status, result }) => {
-        setIsLoading(false);
-        if (status === 429) {
-          return setError(result.message || "Too many requests. Please try again later.");
-        }
-        if (result.data?.devOtp) {
-          setOtp(result.data.devOtp);
-        }
-        setResendCooldown(RESEND_COOLDOWN_SEC);
-      })
-      .catch((fetchError) => {
-        setIsLoading(false);
-        console.log("error", fetchError);
-        setError(fetchError.message || "Network error");
-      });
+    if (status === 429 || !ok) {
+      return setError(message);
+    }
+
+    if (data.devOtp) {
+      setOtp(data.devOtp);
+    }
+    setResendCooldown(RESEND_COOLDOWN_SEC);
   };
+
+  if (!email) {
+    return null;
+  }
 
   return (
     <ConnectionAlert onChange={() => {}}>
@@ -122,6 +117,7 @@ const VerifyRecoveryOtpScreen = ({ navigation, route }) => {
             />
           </TouchableOpacity>
         </View>
+        <RecoveryStepIndicator currentStep={1} />
         <View style={styles.screenNameContainer}>
           <Text style={styles.screenNameText} testID="verify-recovery-otp-heading">Verify Code</Text>
           <Text style={styles.screenNameParagraph} testID="verify-recovery-otp-hint">
@@ -132,10 +128,11 @@ const VerifyRecoveryOtpScreen = ({ navigation, route }) => {
           <CustomAlert message={error} type={"error"} testID="verify-recovery-otp-alert" />
           <CustomInput
             value={otp}
-            setValue={setOtp}
+            setValue={otpInputDisabled ? () => {} : setOtp}
             placeholder={"6-digit code"}
             keyboardType={"number-pad"}
             maxLength={6}
+            editable={!otpInputDisabled}
             placeholderTextColor={colors.muted}
             radius={5}
             testID="verify-recovery-otp-input"

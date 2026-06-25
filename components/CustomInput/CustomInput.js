@@ -13,6 +13,7 @@ const CustomInput = ({
   width = "100%",
   keyboardType,
   maxLength,
+  editable = true,
   testID,
 }) => {
   return (
@@ -28,6 +29,7 @@ const CustomInput = ({
         borderRadius={radius}
         maxLength={maxLength}
         keyboardType={keyboardType}
+        editable={editable}
         testID={testID}
       />
     </View>

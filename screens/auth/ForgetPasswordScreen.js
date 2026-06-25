@@ -1,20 +1,22 @@
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import React, { useState } from "react";
 import { Ionicons } from "@expo/vector-icons";
-import { colors, network } from "../../constants";
+import { colors } from "../../constants";
 import CustomInput from "../../components/CustomInput";
 import CustomButton from "../../components/CustomButton";
 import CustomAlert from "../../components/CustomAlert/CustomAlert";
 import ConnectionAlert from "../../components/ConnectionAlert/ConnectionAlert";
 import ProgressDialog from "react-native-progress-dialog";
+import RecoveryStepIndicator from "../../components/RecoveryStepIndicator";
 import { validateEmail } from "../../utils/passwordValidation";
+import { requestRecoveryCode } from "../../services/passwordRecoveryApi";
 
 const ForgetPasswordScreen = ({ navigation }) => {
   const [email, setEmail] = useState("");
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
-  const sendCodeHandle = () => {
+  const sendCodeHandle = async () => {
     const validation = validateEmail(email);
     if (!validation.valid) {
       return setError(validation.error);
@@ -23,33 +25,17 @@ const ForgetPasswordScreen = ({ navigation }) => {
     setError("");
     setIsLoading(true);
 
-    const myHeaders = new Headers();
-    myHeaders.append("Content-Type", "application/json");
+    const { ok, status, message, data } = await requestRecoveryCode(email);
+    setIsLoading(false);
 
-    fetch(network.serverip + "/password-recovery/request", {
-      method: "POST",
-      headers: myHeaders,
-      body: JSON.stringify({ email: email.trim() }),
-    })
-      .then((response) => response.json().then((result) => ({ status: response.status, result })))
-      .then(({ status, result }) => {
-        setIsLoading(false);
-        if (status === 429) {
-          return setError(result.message || "Too many requests. Please try again later.");
-        }
-        if (!result.success) {
-          return setError(result.message || "Unable to send recovery code");
-        }
-        navigation.navigate("verifyrecoveryotp", {
-          email: email.trim().toLowerCase(),
-          devOtp: result.data?.devOtp,
-        });
-      })
-      .catch((fetchError) => {
-        setIsLoading(false);
-        console.log("error", fetchError);
-        setError(fetchError.message || "Network error");
-      });
+    if (status === 429 || !ok) {
+      return setError(message);
+    }
+
+    navigation.navigate("verifyrecoveryotp", {
+      email: email.trim().toLowerCase(),
+      devOtp: data.devOtp,
+    });
   };
 
   return (
@@ -70,6 +56,7 @@ const ForgetPasswordScreen = ({ navigation }) => {
             />
           </TouchableOpacity>
         </View>
+        <RecoveryStepIndicator currentStep={0} />
         <View style={styles.screenNameContainer}>
           <View>
             <Text style={styles.screenNameText} testID="forget-password-heading">Reset Password</Text>

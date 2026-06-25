@@ -284,51 +284,22 @@ let orders = [
 
 // ─── Password recovery module ─────────────────────────────────────────────────
 
-const OTP_EXPIRY_MS = 15 * 60 * 1000;
-const RESET_TOKEN_EXPIRY_MS = 10 * 60 * 1000;
-const OTP_LENGTH = 6;
-const MAX_VERIFY_ATTEMPTS = 5;
-const MAX_REQUESTS_PER_EMAIL_WINDOW = 3;
-const REQUEST_WINDOW_MS = 15 * 60 * 1000;
-const IS_MOCK_DELIVERY = process.env.NODE_ENV !== "production";
+const {
+  MAX_VERIFY_ATTEMPTS,
+  MAX_REQUESTS_PER_EMAIL_WINDOW,
+  RESET_TOKEN_EXPIRY_MS,
+  setUsers,
+  generateOtp,
+  findUserByEmail,
+  countRecentRequests,
+  invalidatePendingForEmail,
+  createRecoveryRecord,
+  findActiveRecord,
+  findVerifiedRecord,
+} = require("./lib/passwordRecovery");
+const { deliverOtp, IS_MOCK_DELIVERY } = require("./lib/otpDelivery");
 
-let passwordRecoveryRequests = [];
-
-function generateOtp() {
-  const max = Math.pow(10, OTP_LENGTH);
-  const num = Math.floor(Math.random() * max);
-  return String(num).padStart(OTP_LENGTH, "0");
-}
-
-function findUserByEmail(email) {
-  const normalized = email.trim().toLowerCase();
-  return users.find((u) => u.email.trim().toLowerCase() === normalized);
-}
-
-function countRecentRequests(email) {
-  const normalized = email.trim().toLowerCase();
-  const windowStart = Date.now() - REQUEST_WINDOW_MS;
-  return passwordRecoveryRequests.filter(
-    (r) =>
-      r.email === normalized &&
-      new Date(r.createdAt).getTime() >= windowStart
-  ).length;
-}
-
-function invalidatePendingForEmail(email) {
-  const normalized = email.trim().toLowerCase();
-  passwordRecoveryRequests.forEach((r) => {
-    if (r.email === normalized && !r.consumed) {
-      r.consumed = true;
-    }
-  });
-}
-
-function deliverOtp(email, otp) {
-  if (IS_MOCK_DELIVERY) {
-    console.log(`dev_otp_issued: email=${email} otp=${otp}`);
-  }
-}
+setUsers(users);
 
 // POST /password-recovery/request
 app.post("/password-recovery/request", (req, res) => {
@@ -352,20 +323,8 @@ app.post("/password-recovery/request", (req, res) => {
   if (user) {
     invalidatePendingForEmail(email);
     otp = generateOtp();
-    const record = {
-      id: uuidv4(),
-      email,
-      otp,
-      expiresAt: new Date(Date.now() + OTP_EXPIRY_MS).toISOString(),
-      verified: false,
-      resetToken: null,
-      resetTokenExpiresAt: null,
-      consumed: false,
-      verifyAttempts: 0,
-      createdAt: new Date().toISOString(),
-    };
-    passwordRecoveryRequests.push(record);
-    deliverOtp(email, otp);
+    createRecoveryRecord(email, otp);
+    deliverOtp({ email, otp });
     console.log("password_recovery_requested:", email);
   }
 
@@ -391,9 +350,7 @@ app.post("/password-recovery/verify", (req, res) => {
   }
 
   const email = rawEmail.trim().toLowerCase();
-  const record = passwordRecoveryRequests
-    .filter((r) => r.email === email && !r.consumed)
-    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))[0];
+  const record = findActiveRecord(email);
 
   if (!record || new Date(record.expiresAt).getTime() <= Date.now()) {
     console.log("password_recovery_failed: reason=invalid_or_expired");
@@ -449,15 +406,7 @@ app.post("/password-recovery/reset", (req, res) => {
   }
 
   const email = rawEmail.trim().toLowerCase();
-  const record = passwordRecoveryRequests.find(
-    (r) =>
-      r.email === email &&
-      r.resetToken === resetToken &&
-      r.verified &&
-      !r.consumed &&
-      r.resetTokenExpiresAt &&
-      new Date(r.resetTokenExpiresAt).getTime() > Date.now()
-  );
+  const record = findVerifiedRecord(email, resetToken);
 
   if (!record) {
     console.log("password_recovery_failed: reason=expired_session");
