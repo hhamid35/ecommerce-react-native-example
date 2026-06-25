@@ -1,0 +1,52 @@
+appId: com.abidrazaa.EasyBuy
+name: "Forget Password - Invalid Email Format (Negative)"
+tags:
+    - forget-password-invalid-email
+---
+
+# AC 1: Launch the application
+- launchApp
+
+# AC 2: Wait for splash auto-navigation to complete
+- assertVisible:
+    id: "splash-screen"
+- extendedWaitUntil:
+    notVisible:
+      id: "splash-screen"
+    timeout: 30000
+- assertVisible:
+    id: "login-screen"
+
+# AC 3: Tap the Forget Password link on Login screen
+- evalScript: ${output.scrollAttempt = 0}
+- repeat:
+    times: 10
+    while:
+      notVisible:
+        id: "login-forget-password"
+    commands:
+      - swipe:
+          from:
+            id: "login-scroll"
+          direction: UP
+          duration: 400
+      - evalScript: ${output.scrollAttempt = output.scrollAttempt + 1}
+- tapOn:
+    id: "login-forget-password"
+- assertVisible:
+    id: "forget-password-screen"
+
+# AC 4: Enter invalid email in the email input field
+- tapOn:
+    id: "forget-password-email-input"
+- inputText: "not-an-email"
+- hideKeyboard
+
+# AC 5: Tap the Send Code button and verify inline error alert
+- tapOn:
+    id: "forget-password-submit-btn"
+- assertVisible:
+    id: "forget-password-alert-message"
+- assertVisible: ".*Email is not valid.*"
+- assertVisible:
+    id: "forget-password-screen"
