@@ -19,6 +19,7 @@ npm run dev       # starts with nodemon (auto-restart on file changes)
 | POST | `/register` | — | Register a new user |
 | POST | `/login` | — | Login (returns user with token) |
 | GET | `/products` | — | List all products |
+| GET | `/products/lookup?code=` | — | Look up product by scanned SKU or externalId |
 | POST | `/product` | Admin | Add a product |
 | POST | `/update-product?id=` | Admin | Update a product |
 | GET | `/delete-product?id=` | Admin | Delete a product |
@@ -78,3 +79,22 @@ The server starts with pre-seeded data:
 - **3 orders**: in various statuses (pending, shipped, delivered)
 
 All data is stored in-memory and resets when the server restarts.
+
+## Scan-to-product QA fixtures
+
+Use these codes when testing barcode/QR scanning (v1):
+
+| Test case | Code | Expected product | Match field |
+|-----------|------|------------------|-------------|
+| SKU match | `GAR-001` | Classic White T-Shirt (`prod001`) | `sku` |
+| SKU match | `ELC-001` | Wireless Bluetooth Headphones (`prod003`) | `sku` |
+| External ID match | `885909950805` | Wireless Bluetooth Headphones (`prod003`) | `externalId` |
+| Not found | `UNKNOWN-999` | 404 — No product found for scanned code | — |
+
+Example lookup:
+
+```bash
+curl 'http://localhost:3002/products/lookup?code=GAR-001'
+curl 'http://localhost:3002/products/lookup?code=885909950805'
+curl 'http://localhost:3002/products/lookup?code=UNKNOWN-999'
+```
