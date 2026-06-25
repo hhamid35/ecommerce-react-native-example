@@ -31,7 +31,8 @@
       },
       "package": "com.abidrazaa.EasyBuy",
       "permissions": [
-        "android.permission.RECORD_AUDIO"
+        "android.permission.RECORD_AUDIO",
+        "android.permission.CAMERA"
       ]
     },
     "web": {
@@ -45,6 +46,12 @@
         "expo-image-picker",
         {
           "photosPermission": "The app accesses your photos to let you share them with your friends."
+        }
+      ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow EasyBuy to access your camera to scan product barcodes and QR codes."
         }
       ],
       "expo-secure-store"

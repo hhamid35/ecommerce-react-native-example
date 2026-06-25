@@ -3,6 +3,10 @@ const cors = require("cors");
 const multer = require("multer");
 const path = require("path");
 const { v4: uuidv4 } = require("uuid");
+const {
+  normalizeLookupCode,
+  resolveProductByCode,
+} = require("./productLookup");
 
 const app = express();
 const PORT = 3002;
@@ -79,6 +83,7 @@ let products = [
     _id: "prod001",
     title: "Classic White T-Shirt",
     sku: "GAR-001",
+    externalId: "",
     price: 19.99,
     quantity: 50,
     description: "A comfortable everyday white t-shirt made from 100% cotton.",
@@ -92,6 +97,7 @@ let products = [
     _id: "prod002",
     title: "Blue Denim Jeans",
     sku: "GAR-002",
+    externalId: "",
     price: 49.99,
     quantity: 30,
     description: "Slim-fit blue denim jeans for a modern look.",
@@ -105,6 +111,7 @@ let products = [
     _id: "prod003",
     title: "Wireless Bluetooth Headphones",
     sku: "ELC-001",
+    externalId: "885909950805",
     price: 89.99,
     quantity: 20,
     description: "High-quality wireless headphones with noise cancellation.",
@@ -118,6 +125,7 @@ let products = [
     _id: "prod004",
     title: "Smartphone Stand",
     sku: "ELC-002",
+    externalId: "",
     price: 14.99,
     quantity: 100,
     description: "Adjustable aluminum smartphone and tablet stand.",
@@ -131,6 +139,7 @@ let products = [
     _id: "prod005",
     title: "Face Moisturizer SPF 30",
     sku: "COS-001",
+    externalId: "",
     price: 24.99,
     quantity: 60,
     description: "Daily face moisturizer with SPF 30 sun protection.",
@@ -144,6 +153,7 @@ let products = [
     _id: "prod006",
     title: "Lipstick Set (6 Colors)",
     sku: "COS-002",
+    externalId: "",
     price: 34.99,
     quantity: 40,
     description: "Long-lasting matte lipstick set in 6 vibrant shades.",
@@ -157,6 +167,7 @@ let products = [
     _id: "prod007",
     title: "Organic Basmati Rice (5kg)",
     sku: "GRO-001",
+    externalId: "",
     price: 12.99,
     quantity: 200,
     description: "Premium organic basmati rice, long grain and aromatic.",
@@ -170,6 +181,7 @@ let products = [
     _id: "prod008",
     title: "Extra Virgin Olive Oil (1L)",
     sku: "GRO-002",
+    externalId: "",
     price: 18.99,
     quantity: 80,
     description: "Cold-pressed extra virgin olive oil from Mediterranean farms.",
@@ -345,9 +357,47 @@ app.get("/products", (req, res) => {
   res.json({ success: true, data: products });
 });
 
+// GET /products/lookup?code=
+app.get("/products/lookup", (req, res) => {
+  const { code } = req.query;
+  const normalized = normalizeLookupCode(code);
+
+  if (!normalized) {
+    return res.status(400).json({
+      success: false,
+      message: "Query parameter code is required",
+    });
+  }
+
+  const match = resolveProductByCode(normalized, products);
+
+  console.log(
+    JSON.stringify({
+      event: "product_lookup",
+      code: normalized,
+      found: !!match,
+      matchedBy: match ? match.matchedBy : null,
+    })
+  );
+
+  if (!match) {
+    return res.status(404).json({
+      success: false,
+      message: "No product found for scanned code",
+      code: normalized,
+    });
+  }
+
+  res.json({
+    success: true,
+    data: match.product,
+    matchedBy: match.matchedBy,
+  });
+});
+
 // POST /product  (admin: add product)
 app.post("/product", adminMiddleware, (req, res) => {
-  const { title, sku, price, image, description, category, quantity } = req.body;
+  const { title, sku, price, image, description, category, quantity, externalId } = req.body;
   if (!title || !price) {
     return res.status(400).json({ success: false, message: "Title and price are required" });
   }
@@ -356,6 +406,7 @@ app.post("/product", adminMiddleware, (req, res) => {
     _id: uuidv4(),
     title,
     sku: sku || "",
+    externalId: externalId || "",
     price: parseFloat(price),
     quantity: parseInt(quantity) || 0,
     description: description || "",
@@ -373,12 +424,13 @@ app.post("/update-product", adminMiddleware, (req, res) => {
   if (idx === -1) {
     return res.status(404).json({ success: false, message: "Product not found" });
   }
-  const { title, sku, price, image, description, category, quantity } = req.body;
+  const { title, sku, price, image, description, category, quantity, externalId } = req.body;
   const cat = categories.find((c) => c._id === category);
   products[idx] = {
     ...products[idx],
     title: title || products[idx].title,
     sku: sku || products[idx].sku,
+    externalId: externalId !== undefined ? externalId : products[idx].externalId,
     price: price ? parseFloat(price) : products[idx].price,
     quantity: quantity !== undefined ? parseInt(quantity) : products[idx].quantity,
     description: description || products[idx].description,
@@ -601,6 +653,7 @@ app.listen(PORT, "0.0.0.0", () => {
   console.log(`   POST   /register`);
   console.log(`   POST   /login`);
   console.log(`   GET    /products`);
+  console.log(`   GET    /products/lookup?code=`);
   console.log(`   POST   /product              (admin)`);
   console.log(`   POST   /update-product?id=   (admin)`);
   console.log(`   GET    /delete-product?id=   (admin)`);

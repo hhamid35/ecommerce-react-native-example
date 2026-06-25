@@ -1,17 +1,45 @@
-import React from "react";
-import { View, Text, TouchableOpacity, Image, StyleSheet } from "react-native";
+import React, { useEffect, useState } from "react";
+import { View, Text, TouchableOpacity, Image, StyleSheet, Platform, Alert } from "react-native";
 import SearchableDropdown from "react-native-searchable-dropdown";
 import { colors } from "../../constants";
 import scanIcon from "../../assets/icons/scan_icons.png";
 
-const SearchBar = ({ searchItems, handleProductPress }) => {
+const SCAN_ENABLED = process.env.EXPO_PUBLIC_SCAN_ENABLED !== "false";
+
+const SearchBar = ({ searchItems, handleProductPress, onScanPress, prefillSearch }) => {
+  const [searchText, setSearchText] = useState("");
+
+  useEffect(() => {
+    if (prefillSearch) {
+      setSearchText(prefillSearch);
+    }
+  }, [prefillSearch]);
+
+  const handleScanPress = () => {
+    if (Platform.OS === "web") {
+      Alert.alert(
+        "Scan unavailable",
+        "Barcode scanning is available on iOS and Android."
+      );
+      return;
+    }
+    if (onScanPress) {
+      onScanPress();
+    }
+  };
+
   return (
     <View style={styles.searchContainer} testID="search-bar">
       <View style={styles.inputContainer} testID="search-bar-input-container">
         <SearchableDropdown
-          onTextChange={(text) => console.log(text)}
+          key={prefillSearch || "default"}
+          onTextChange={(text) => setSearchText(text)}
           onItemSelect={(item) => handleProductPress(item)}
           defaultIndex={0}
+          textInputProps={{
+            value: searchText,
+            onChangeText: setSearchText,
+          }}
           containerStyle={{
             borderRadius: 5,
             width: "100%",
@@ -47,12 +75,24 @@ const SearchBar = ({ searchItems, handleProductPress }) => {
           underlineColorAndroid="transparent"
         />
       </View>
-      <View style={styles.buttonContainer}>
-        <TouchableOpacity style={styles.scanButton} testID="search-bar-scan-btn">
-          <Text style={styles.scanButtonText} testID="search-bar-scan-text">Scan</Text>
-          <Image source={scanIcon} style={{ width: 20, height: 20 }} testID="search-bar-scan-icon" />
-        </TouchableOpacity>
-      </View>
+      {SCAN_ENABLED ? (
+        <View style={styles.buttonContainer}>
+          <TouchableOpacity
+            style={styles.scanButton}
+            onPress={handleScanPress}
+            testID="search-bar-scan-btn"
+          >
+            <Text style={styles.scanButtonText} testID="search-bar-scan-text">
+              Scan
+            </Text>
+            <Image
+              source={scanIcon}
+              style={{ width: 20, height: 20 }}
+              testID="search-bar-scan-icon"
+            />
+          </TouchableOpacity>
+        </View>
+      ) : null}
     </View>
   );
 };

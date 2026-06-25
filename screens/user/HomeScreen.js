@@ -3,6 +3,8 @@ import {
   StatusBar,
   View,
   ScrollView,
+  Platform,
+  Alert,
 } from "react-native";
 import React, { useEffect, useState } from "react";
 import { colors } from "../../constants";
@@ -29,6 +31,7 @@ const HomeScreen = ({ navigation, route }) => {
   const [error, setError] = useState("");
   const [userInfo, setUserInfo] = useState({});
   const [searchItems, setSearchItems] = useState([]);
+  const [prefillSearch, setPrefillSearch] = useState("");
 
   //method to convert the authUser to json object
   const convertToJSON = (obj) => {
@@ -42,6 +45,17 @@ const HomeScreen = ({ navigation, route }) => {
   //method to navigate to product detail screen of a specific product
   const handleProductPress = (product) => {
     navigation.navigate("productdetail", { product: product });
+  };
+
+  const handleScanPress = () => {
+    if (Platform.OS === "web") {
+      Alert.alert(
+        "Scan unavailable",
+        "Barcode scanning is available on iOS and Android."
+      );
+      return;
+    }
+    navigation.navigate("scan");
   };
 
   //method to add to cart (redux)
@@ -90,6 +104,13 @@ const HomeScreen = ({ navigation, route }) => {
     fetchProduct();
   }, []);
 
+  useEffect(() => {
+    if (route.params?.prefillSearch) {
+      setPrefillSearch(route.params.prefillSearch);
+      navigation.setParams({ prefillSearch: undefined });
+    }
+  }, [route.params?.prefillSearch]);
+
   return (
     <View style={styles.container} testID="home-screen">
       <StatusBar testID="home-status-bar"></StatusBar>
@@ -98,6 +119,8 @@ const HomeScreen = ({ navigation, route }) => {
         <SearchBar
           searchItems={searchItems}
           handleProductPress={handleProductPress}
+          onScanPress={handleScanPress}
+          prefillSearch={prefillSearch}
         />
         <ScrollView nestedScrollEnabled={true} testID="home-scroll">
           <PromotionSlider slides={slides} />
