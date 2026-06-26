@@ -1,0 +1,144 @@
+appId: com.abidrazaa.EasyBuy
+name: "Flight Info Card - Real-time update via flightUpdated subscription"
+tags:
+    - flight-info-card-subscription
+    - flight-updated
+---
+
+# Prerequisites: User is logged in; flight list has at least one tile; getFlight data available; backend or test harness can emit flightUpdated subscription events; baseline and updated getFlight field values supplied via test execution env
+
+# AC 1: Launch the application
+- launchApp
+- assertVisible:
+    id: "splash-screen"
+
+# AC 2: Wait for application initialization to complete
+- extendedWaitUntil:
+    notVisible:
+      id: "splash-screen"
+    timeout: 30000
+- waitForAnimationToEnd
+- runFlow:
+    when:
+      visible:
+        id: "login-screen"
+    commands:
+      - assertVisible:
+          id: "login-screen"
+- runFlow:
+    when:
+      notVisible:
+        id: "login-screen"
+    commands:
+      - assertVisible:
+          id: "tab-home-icon"
+      - assertVisible:
+          id: "tab-categories-icon"
+
+# Prerequisite: User is logged in to the application
+- runFlow:
+    when:
+      visible:
+        id: "login-screen"
+    commands:
+      - tapOn:
+          id: "login-email-input"
+      - inputText: "user@easybuy.com"
+      - tapOn:
+          id: "login-password-input"
+      - inputText: "user123"
+      - hideKeyboard
+      - tapOn:
+          id: "login-submit-btn"
+      - waitForAnimationToEnd
+      - assertVisible:
+          id: "tab-home-icon"
+
+# AC 2 continued: Tabs navigator is displayed with the bottom tab bar visible
+# NOTE: tab icons resolved from Tabs.js (source lookup)
+- assertVisible:
+    id: "tab-home-icon"
+- assertVisible:
+    id: "tab-categories-icon"
+
+# AC 3: Tap the Home tab in the bottom tab navigator
+- tapOn:
+    id: "tab-home-icon"
+- assertVisible:
+    id: "home-screen"
+- assertVisible:
+    id: "home-scroll"
+
+# Prerequisite: At least one flight tile is visible in the flight list
+- extendedWaitUntil:
+    notVisible:
+      id: "new-arrivals-empty"
+    timeout: 30000
+
+# AC 4: Tap the first flight tile in the list on HomeScreen
+# MANUAL REVIEW: Flight list tile selectors are not present in dom_extract.json; using new-arrivals-product-0 as flight tile proxy
+- evalScript: ${output.scrollAttempt = 0}
+- repeat:
+    times: 10
+    while:
+      notVisible:
+        id: "new-arrivals-product-0"
+    commands:
+      - swipe:
+          from:
+            id: "home-scroll"
+          direction: UP
+          duration: 400
+      - evalScript: ${output.scrollAttempt = output.scrollAttempt + 1}
+- assertVisible:
+    id: "new-arrivals-product-0"
+- tapOn:
+    id: "new-arrivals-product-0"
+    below:
+      id: "new-arrivals-heading"
+    index: 0
+- waitForAnimationToEnd
+# MANUAL REVIEW: ProductDetailScreen used as flight detail screen; flight info card elements not in dom_extract.json
+- assertVisible:
+    id: "product-detail-screen"
+- assertVisible:
+    id: "product-detail-image"
+
+# AC 5: Note the current values displayed on the flight info card (status, times, gates)
+# MANUAL REVIEW: flight-info-card elements are not present in dom_extract.json; recording baseline getFlight values from test execution env for comparison after subscription update
+- evalScript: ${output.baselineOverallStatus = overall_status_label}
+- evalScript: ${output.baselineDetailedStatus = detailed_status_code}
+- evalScript: ${output.baselineOriginGate = origin_gate}
+- evalScript: ${output.baselineDestinationGate = destination_gate}
+- evalScript: ${output.baselineEtdLocal = etd_local}
+- evalScript: ${output.baselineEtaLocal = eta_local}
+- assertVisible: ".*${overall_status_label}.*"
+- assertVisible: ".*${detailed_status_code}.*"
+- assertVisible: ".*${origin_gate}.*"
+- assertVisible: ".*${destination_gate}.*"
+- assertVisible: ".*${etd_local}.*"
+- assertVisible: ".*${eta_local}.*"
+
+# AC 6: Trigger a flightUpdated subscription event with changed getFlight data for the selected flight
+# MANUAL REVIEW: flightUpdated subscription emit script is not present in scripts repository; test harness emits event using flight_id env var and updated getFlight payload
+- evalScript: ${output.selectedFlightId = flight_id}
+
+# AC 7: Verify the flight info card on ProductDetailScreen after the subscription update
+# MANUAL REVIEW: flight-info-card elements are not present in dom_extract.json; waiting for updated getFlight values to appear without manual page navigation
+- extendedWaitUntil:
+    visible: ".*${updated_overall_status_label}.*"
+    timeout: 30000
+- assertVisible:
+    id: "product-detail-screen"
+- assertVisible: ".*${updated_overall_status_label}.*"
+- assertVisible: ".*${updated_detailed_status_code}.*"
+- assertVisible: ".*${updated_origin_gate}.*"
+- assertVisible: ".*${updated_destination_gate}.*"
+- assertVisible: ".*${updated_etd_local}.*"
+- assertVisible: ".*${updated_eta_local}.*"
+- assertNotVisible: ".*${output.baselineOverallStatus}.*"
+- assertNotVisible: ".*${output.baselineDetailedStatus}.*"
+- assertNotVisible: ".*${output.baselineOriginGate}.*"
+- assertNotVisible: ".*${output.baselineDestinationGate}.*"
+- assertNotVisible: ".*${output.baselineEtdLocal}.*"
+- assertNotVisible: ".*${output.baselineEtaLocal}.*"

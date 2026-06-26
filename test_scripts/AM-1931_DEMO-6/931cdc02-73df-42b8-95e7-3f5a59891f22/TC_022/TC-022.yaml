@@ -1,0 +1,105 @@
+appId: com.abidrazaa.EasyBuy
+name: "Flight Info Card - Relative times for ON and ARR status"
+tags:
+    - flight-info-card-relative-times
+    - on-arr
+---
+
+# Prerequisites: User is logged in; flights with detailedStatusCode ON or ARR and past departure and arrival times exist in the flight list; flight data available from getFlight query API
+
+# AC 1: Launch the application
+- launchApp
+- assertVisible:
+    id: "splash-screen"
+
+# AC 2: Wait for application initialization to complete
+- extendedWaitUntil:
+    notVisible:
+      id: "splash-screen"
+    timeout: 30000
+- waitForAnimationToEnd
+- runFlow:
+    when:
+      visible:
+        id: "login-screen"
+    commands:
+      - assertVisible:
+          id: "login-screen"
+- runFlow:
+    when:
+      notVisible:
+        id: "login-screen"
+    commands:
+      - assertVisible:
+          id: "tab-home-icon"
+      - assertVisible:
+          id: "tab-categories-icon"
+
+# Prerequisite: User is logged in to the application
+- runFlow:
+    when:
+      visible:
+        id: "login-screen"
+    commands:
+      - tapOn:
+          id: "login-email-input"
+      - inputText: "user@easybuy.com"
+      - tapOn:
+          id: "login-password-input"
+      - inputText: "user123"
+      - hideKeyboard
+      - tapOn:
+          id: "login-submit-btn"
+      - waitForAnimationToEnd
+      - assertVisible:
+          id: "tab-home-icon"
+
+# AC 2 continued: Tabs navigator is displayed with the bottom tab bar visible
+# NOTE: tab icons resolved from Tabs.js (source lookup)
+- assertVisible:
+    id: "tab-home-icon"
+- assertVisible:
+    id: "tab-categories-icon"
+
+# AC 3: Tap the Home tab in the bottom tab navigator
+- tapOn:
+    id: "tab-home-icon"
+- assertVisible:
+    id: "home-screen"
+- assertVisible:
+    id: "home-scroll"
+
+# AC 4: Tap a flight tile whose getFlight detailedStatusCode is ON or ARR
+# MANUAL REVIEW: Flight list tile selectors are not present in dom_extract.json; scrolling to locate a tile showing ON or ARR detailed status
+- evalScript: ${output.scrollAttempt = 0}
+- repeat:
+    times: 10
+    while:
+      notVisible: ".*(ON|ARR).*"
+    commands:
+      - swipe:
+          from:
+            id: "home-scroll"
+          direction: UP
+          duration: 400
+      - evalScript: ${output.scrollAttempt = output.scrollAttempt + 1}
+- assertVisible: ".*(ON|ARR).*"
+- tapOn:
+    text: ".*(ON|ARR).*"
+    below:
+      id: "home-header"
+    index: 0
+- waitForAnimationToEnd
+# MANUAL REVIEW: ProductDetailScreen used as flight detail screen; flight info card elements not in dom_extract.json
+- assertVisible:
+    id: "product-detail-screen"
+- assertVisible:
+    id: "product-detail-image"
+
+# AC 5: Verify the origin relative time label on the flight info card
+# MANUAL REVIEW: flight-info-card origin relative time testID is not present in dom_extract.json; asserting pattern departed Xh Ym ago computed from current time
+- assertVisible: ".*departed [0-9]+h [0-9]+m ago.*"
+
+# AC 6: Verify the destination relative time label on the flight info card
+# MANUAL REVIEW: flight-info-card destination relative time testID is not present in dom_extract.json; asserting pattern arrived Xh Ym ago computed from current time
+- assertVisible: ".*arrived [0-9]+h [0-9]+m ago.*"

@@ -1,0 +1,47 @@
+appId: com.abidrazaa.EasyBuy
+name: "Flight Info Card - Unauthenticated user redirected to login"
+tags:
+    - flight-info-card
+    - negative
+    - authentication
+---
+
+# Prerequisites: Ensure user is not logged in
+- clearState
+- launchApp
+
+# AC 1: Launch the application
+- assertVisible:
+    id: "splash-screen"
+
+# AC 2: Wait for application initialization to complete
+- extendedWaitUntil:
+    notVisible:
+      id: "splash-screen"
+    timeout: 30000
+- waitForAnimationToEnd
+- assertVisible:
+    id: "login-screen"
+- assertVisible:
+    id: "login-heading"
+
+# AC 3: Attempt to reach flight details without completing login
+# MANUAL REVIEW: FlightDetailScreen and flight-info-card not in dom_extract.json; ProductDetailScreen and new-arrivals-product-0 used as flight detail proxies
+- tapOn:
+    id: "tab-home-icon"
+    optional: true
+- tapOn:
+    id: "new-arrivals-product-0"
+    below:
+      id: "new-arrivals-heading"
+    index: 0
+    optional: true
+- waitForAnimationToEnd
+- assertVisible:
+    id: "login-screen"
+- assertNotVisible:
+    id: "product-detail-screen"
+- assertNotVisible:
+    id: "product-detail-image"
+- assertNotVisible:
+    id: "home-screen"

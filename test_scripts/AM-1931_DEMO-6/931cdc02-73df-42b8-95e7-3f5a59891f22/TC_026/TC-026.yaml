@@ -1,0 +1,109 @@
+appId: com.abidrazaa.EasyBuy
+name: "Flight Info Card - Navigate from Categories tab list"
+tags:
+    - flight-info-card-navigate-categories
+---
+
+# Prerequisites: REQUIRES TEST DATA; user logged in; at least one flight tile visible in Categories tab list; getFlight data available via test execution env
+
+# AC 1: Launch the application
+- launchApp
+- assertVisible:
+    id: "splash-screen"
+
+# AC 2: Wait for application initialization to complete
+- extendedWaitUntil:
+    notVisible:
+      id: "splash-screen"
+    timeout: 30000
+- waitForAnimationToEnd
+- runFlow:
+    when:
+      visible:
+        id: "login-screen"
+    commands:
+      - assertVisible:
+          id: "login-screen"
+- runFlow:
+    when:
+      notVisible:
+        id: "login-screen"
+    commands:
+      - assertVisible:
+          id: "tab-home-icon"
+      - assertVisible:
+          id: "tab-categories-icon"
+
+# Prerequisite: User is logged in to the application
+- runFlow:
+    when:
+      visible:
+        id: "login-screen"
+    commands:
+      - tapOn:
+          id: "login-email-input"
+      - inputText: "user@easybuy.com"
+      - tapOn:
+          id: "login-password-input"
+      - inputText: "user123"
+      - hideKeyboard
+      - tapOn:
+          id: "login-submit-btn"
+      - waitForAnimationToEnd
+      - extendedWaitUntil:
+          notVisible:
+            id: "login-screen"
+          timeout: 30000
+
+# AC 2: Tabs navigator is displayed with bottom tab bar visible
+# NOTE: tab icons resolved from Tabs.js (source lookup)
+- assertVisible:
+    id: "tab-home-icon"
+- assertVisible:
+    id: "tab-categories-icon"
+
+# AC 3: Tap the Categories tab in the bottom tab navigator
+- tapOn:
+    id: "tab-categories-icon"
+- assertVisible:
+    id: "categories-screen"
+- assertVisible:
+    id: "categories-products-list"
+
+# Prerequisite: At least one flight tile is visible in the Categories tab list
+- extendedWaitUntil:
+    notVisible:
+      id: "categories-empty-text"
+    timeout: 30000
+
+# AC 4: Tap the first flight tile in the list on CategoriesScreen
+# MANUAL REVIEW: Flight list tile selectors use dynamic product._id; using categories-product-${flight_product_id} from test execution env as first tile target
+- evalScript: ${output.scrollAttempt = 0}
+- repeat:
+    times: 10
+    while:
+      notVisible:
+        id: "categories-product-${flight_product_id}"
+    commands:
+      - evalScript: ${output.scrollDuration = 50 + output.scrollAttempt * 50}
+      - swipe:
+          from:
+            id: "categories-products-list"
+          direction: UP
+          duration: ${output.scrollDuration}
+      - evalScript: ${output.scrollAttempt = output.scrollAttempt + 1}
+- assertVisible:
+    id: "categories-product-${flight_product_id}"
+- tapOn:
+    id: "categories-product-${flight_product_id}"
+    below:
+      id: "categories-tabs"
+    index: 0
+- waitForAnimationToEnd
+- assertVisible:
+    id: "product-detail-screen"
+
+# AC 5: Verify the flight info card section at the top of ProductDetailScreen
+# MANUAL REVIEW: flight-info-card elements are not present in dom_extract.json; asserting product-detail-image as flight info card visibility proxy with getFlight data loaded
+- assertVisible:
+    id: "product-detail-image"

@@ -1,0 +1,113 @@
+appId: com.abidrazaa.EasyBuy
+name: "Flight Info Card - ETD differs from STD shows strikethrough STD"
+tags:
+    - flight-info-card-etd-std-strikethrough
+---
+
+# Prerequisites: User is logged in; std_local, etd_local, std_gmt, etd_gmt from getFlight API supplied via test execution env; a flight exists where ETD differs from STD
+
+# AC 1: Launch the application
+- launchApp
+- assertVisible:
+    id: "splash-screen"
+
+# AC 2: Wait for application initialization to complete
+- extendedWaitUntil:
+    notVisible:
+      id: "splash-screen"
+    timeout: 30000
+- waitForAnimationToEnd
+- runFlow:
+    when:
+      visible:
+        id: "login-screen"
+    commands:
+      - assertVisible:
+          id: "login-screen"
+- runFlow:
+    when:
+      notVisible:
+        id: "login-screen"
+    commands:
+      - assertVisible:
+          id: "tab-home-icon"
+      - assertVisible:
+          id: "tab-categories-icon"
+
+# Prerequisite: User is logged in to the application
+- runFlow:
+    when:
+      visible:
+        id: "login-screen"
+    commands:
+      - tapOn:
+          id: "login-email-input"
+      - inputText: "user@easybuy.com"
+      - tapOn:
+          id: "login-password-input"
+      - inputText: "user123"
+      - hideKeyboard
+      - tapOn:
+          id: "login-submit-btn"
+      - waitForAnimationToEnd
+      - assertVisible:
+          id: "tab-home-icon"
+
+# AC 2 continued: Tabs navigator is displayed with the bottom tab bar visible
+# NOTE: tab icons resolved from Tabs.js (source lookup)
+- assertVisible:
+    id: "tab-home-icon"
+- assertVisible:
+    id: "tab-categories-icon"
+
+# AC 3: Tap the Home tab in the bottom tab navigator
+- tapOn:
+    id: "tab-home-icon"
+- assertVisible:
+    id: "home-screen"
+- assertVisible:
+    id: "home-scroll"
+
+# AC 4: Tap a flight tile whose getFlight origin estimatedDateTime differs from scheduledDateTime
+- extendedWaitUntil:
+    notVisible:
+      id: "new-arrivals-empty"
+    timeout: 30000
+- evalScript: ${output.scrollAttempt = 0}
+- repeat:
+    times: 10
+    while:
+      notVisible:
+        id: "new-arrivals-product-0"
+    commands:
+      - swipe:
+          from:
+            id: "home-scroll"
+          direction: UP
+          duration: 400
+      - evalScript: ${output.scrollAttempt = output.scrollAttempt + 1}
+# MANUAL REVIEW: Flight list tile selectors are not present in dom_extract.json; using new-arrivals-product-0 as flight tile proxy for flight where ETD differs from STD
+- tapOn:
+    id: "new-arrivals-product-0"
+    below:
+      id: "new-arrivals-heading"
+    index: 0
+- waitForAnimationToEnd
+- assertVisible:
+    id: "product-detail-screen"
+# MANUAL REVIEW: flight-info-card elements are not present in dom_extract.json; asserting product-detail-image as flight info card visibility proxy
+- assertVisible:
+    id: "product-detail-image"
+
+# AC 5: Verify departure ETD and STD display on the flight info card
+# MANUAL REVIEW: flight-info-card elements are not present in dom_extract.json; asserting flightInfo.origin.estimatedDateTime.local from getFlight response
+- assertVisible: ".*${etd_local}.*"
+
+# MANUAL REVIEW: flight-info-card strikethrough styling cannot be verified directly by Maestro; asserting STD local is displayed alongside ETD when estimatedDateTime differs from scheduledDateTime
+- assertVisible: ".*${std_local}.*"
+
+# MANUAL REVIEW: flight-info-card elements are not present in dom_extract.json; asserting flightInfo.origin.estimatedDateTime.GMT from getFlight response
+- assertVisible: ".*${etd_gmt}.*"
+
+# MANUAL REVIEW: flight-info-card strikethrough styling cannot be verified directly by Maestro; asserting STD GMT is displayed alongside ETD when estimatedDateTime differs from scheduledDateTime
+- assertVisible: ".*${std_gmt}.*"

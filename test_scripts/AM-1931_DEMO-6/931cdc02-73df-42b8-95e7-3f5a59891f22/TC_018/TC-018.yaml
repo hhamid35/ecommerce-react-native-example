@@ -1,0 +1,113 @@
+appId: com.abidrazaa.EasyBuy
+name: "Flight Info Card - ETA differs from STA shows strikethrough STA"
+tags:
+    - flight-info-card-eta-sta-strikethrough
+---
+
+# Prerequisites: User is logged in; sta_local, eta_local, sta_gmt, eta_gmt from getFlight API supplied via test execution env; a flight exists where ETA differs from STA
+
+# AC 1: Launch the application
+- launchApp
+- assertVisible:
+    id: "splash-screen"
+
+# AC 2: Wait for application initialization to complete
+- extendedWaitUntil:
+    notVisible:
+      id: "splash-screen"
+    timeout: 30000
+- waitForAnimationToEnd
+- runFlow:
+    when:
+      visible:
+        id: "login-screen"
+    commands:
+      - assertVisible:
+          id: "login-screen"
+- runFlow:
+    when:
+      notVisible:
+        id: "login-screen"
+    commands:
+      - assertVisible:
+          id: "tab-home-icon"
+      - assertVisible:
+          id: "tab-categories-icon"
+
+# Prerequisite: User is logged in to the application
+- runFlow:
+    when:
+      visible:
+        id: "login-screen"
+    commands:
+      - tapOn:
+          id: "login-email-input"
+      - inputText: "user@easybuy.com"
+      - tapOn:
+          id: "login-password-input"
+      - inputText: "user123"
+      - hideKeyboard
+      - tapOn:
+          id: "login-submit-btn"
+      - waitForAnimationToEnd
+      - assertVisible:
+          id: "tab-home-icon"
+
+# AC 2 continued: Tabs navigator is displayed with the bottom tab bar visible
+# NOTE: tab icons resolved from Tabs.js (source lookup)
+- assertVisible:
+    id: "tab-home-icon"
+- assertVisible:
+    id: "tab-categories-icon"
+
+# AC 3: Tap the Home tab in the bottom tab navigator
+- tapOn:
+    id: "tab-home-icon"
+- assertVisible:
+    id: "home-screen"
+- assertVisible:
+    id: "home-scroll"
+
+# AC 4: Tap a flight tile whose getFlight destination estimated arrival differs from scheduled arrival
+- extendedWaitUntil:
+    notVisible:
+      id: "new-arrivals-empty"
+    timeout: 30000
+- evalScript: ${output.scrollAttempt = 0}
+- repeat:
+    times: 10
+    while:
+      notVisible:
+        id: "new-arrivals-product-0"
+    commands:
+      - swipe:
+          from:
+            id: "home-scroll"
+          direction: UP
+          duration: 400
+      - evalScript: ${output.scrollAttempt = output.scrollAttempt + 1}
+# MANUAL REVIEW: Flight list tile selectors are not present in dom_extract.json; using new-arrivals-product-0 as flight tile proxy for flight where ETA differs from STA
+- tapOn:
+    id: "new-arrivals-product-0"
+    below:
+      id: "new-arrivals-heading"
+    index: 0
+- waitForAnimationToEnd
+- assertVisible:
+    id: "product-detail-screen"
+# MANUAL REVIEW: flight-info-card elements are not present in dom_extract.json; asserting product-detail-image as flight info card visibility proxy
+- assertVisible:
+    id: "product-detail-image"
+
+# AC 5: Verify arrival ETA and STA display on the flight info card
+# MANUAL REVIEW: flight-info-card elements are not present in dom_extract.json; asserting flightInfo.destination.estimatedDateTime.local from getFlight response
+- assertVisible: ".*${eta_local}.*"
+
+# MANUAL REVIEW: flight-info-card strikethrough styling cannot be verified directly by Maestro; asserting STA local is displayed alongside ETA when estimatedDateTime differs from scheduledDateTime
+- assertVisible: ".*${sta_local}.*"
+
+# MANUAL REVIEW: flight-info-card elements are not present in dom_extract.json; asserting flightInfo.destination.estimatedDateTime.GMT from getFlight response
+- assertVisible: ".*${eta_gmt}.*"
+
+# MANUAL REVIEW: flight-info-card strikethrough styling cannot be verified directly by Maestro; asserting STA GMT is displayed alongside ETA when estimatedDateTime differs from scheduledDateTime
+- assertVisible: ".*${sta_gmt}.*"

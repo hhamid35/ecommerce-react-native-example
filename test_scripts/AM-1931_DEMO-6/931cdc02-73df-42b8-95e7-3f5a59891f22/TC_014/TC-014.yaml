@@ -1,0 +1,112 @@
+appId: com.abidrazaa.EasyBuy
+name: "Flight Info Card - Baggage carousel hidden when unavailable"
+tags:
+    - flight-info-card-baggage-carousel-hidden
+---
+
+# Prerequisites: User is logged in; a flight without baggage carousel data exists in the flight list; flight data available from the getFlight query API
+
+# AC 1: Launch the application
+- launchApp
+- assertVisible:
+    id: "splash-screen"
+
+# AC 2: Wait for application initialization to complete
+- extendedWaitUntil:
+    notVisible:
+      id: "splash-screen"
+    timeout: 30000
+- waitForAnimationToEnd
+- runFlow:
+    when:
+      visible:
+        id: "login-screen"
+    commands:
+      - assertVisible:
+          id: "login-screen"
+- runFlow:
+    when:
+      notVisible:
+        id: "login-screen"
+    commands:
+      - assertVisible:
+          id: "tab-home-icon"
+      - assertVisible:
+          id: "tab-categories-icon"
+
+# Prerequisite: User is logged in to the application
+- runFlow:
+    when:
+      visible:
+        id: "login-screen"
+    commands:
+      - tapOn:
+          id: "login-email-input"
+      - inputText: "user@easybuy.com"
+      - tapOn:
+          id: "login-password-input"
+      - inputText: "user123"
+      - hideKeyboard
+      - tapOn:
+          id: "login-submit-btn"
+      - waitForAnimationToEnd
+      - assertVisible:
+          id: "home-screen"
+      - assertVisible:
+          id: "tab-home-icon"
+
+# AC 2 continued: Tabs navigator is displayed with the bottom tab bar visible
+# NOTE: tab icons resolved from Tabs.js (source lookup)
+- assertVisible:
+    id: "tab-home-icon"
+- assertVisible:
+    id: "tab-categories-icon"
+
+# AC 3: Tap the Home tab in the bottom tab navigator
+- tapOn:
+    id: "tab-home-icon"
+- assertVisible:
+    id: "home-screen"
+- assertVisible:
+    id: "home-scroll"
+
+# AC 4: Tap a flight tile whose getFlight response has no baggage carousel value
+- extendedWaitUntil:
+    notVisible:
+      id: "new-arrivals-empty"
+    timeout: 30000
+- evalScript: ${output.scrollAttempt = 0}
+- repeat:
+    times: 10
+    while:
+      notVisible:
+        id: "new-arrivals-product-1"
+    commands:
+      - evalScript: ${output.scrollDuration = 50 + output.scrollAttempt * 50}
+      - swipe:
+          from:
+            id: "home-scroll"
+          direction: UP
+          duration: ${output.scrollDuration}
+      - evalScript: ${output.scrollAttempt = output.scrollAttempt + 1}
+- assertNotVisible:
+    id: "new-arrivals-empty"
+# MANUAL REVIEW: Flight list tile selectors are not present in dom_extract.json; using new-arrivals-product-1 as flight tile proxy for flight without baggage carousel
+- tapOn:
+    id: "new-arrivals-product-1"
+    below:
+      id: "new-arrivals-heading"
+    index: 0
+- waitForAnimationToEnd
+# MANUAL REVIEW: ProductDetailScreen used as flight detail screen; flight info card elements not in dom_extract.json
+- assertVisible:
+    id: "product-detail-screen"
+# MANUAL REVIEW: flight-info-card elements are not present in dom_extract.json; asserting product-detail-image as flight info card visibility proxy
+- assertVisible:
+    id: "product-detail-image"
+
+# AC 5: Verify baggage carousel area on the flight info card
+# MANUAL REVIEW: flight-info-card baggage carousel element not in dom_extract.json; verifying section is hidden when flightInfo.destination.baggageCarousel is unavailable
+- assertNotVisible: ".*Baggage carousel.*"
+# MANUAL REVIEW: no placeholder "-" should be shown for baggage carousel when flightInfo.destination.baggageCarousel is unavailable; scoped selector unavailable so asserting baggage carousel label and value patterns are absent
+- assertNotVisible: ".*Baggage carousel.*-.*"

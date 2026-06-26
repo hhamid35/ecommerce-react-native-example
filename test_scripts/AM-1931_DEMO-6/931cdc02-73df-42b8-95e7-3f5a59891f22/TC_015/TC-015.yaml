@@ -1,0 +1,123 @@
+appId: com.abidrazaa.EasyBuy
+name: "Flight Info Card - Scheduled and estimated times local and GMT"
+tags:
+    - flight-info-card-scheduled-estimated-times
+---
+
+# Prerequisites: User is logged in; std_local, sta_local, etd_local, eta_local, std_gmt, sta_gmt, etd_gmt, eta_gmt from getFlight API supplied via test execution env
+
+# AC 1: Launch the application
+- launchApp
+- assertVisible:
+    id: "splash-screen"
+
+# AC 2: Wait for application initialization to complete
+- extendedWaitUntil:
+    notVisible:
+      id: "splash-screen"
+    timeout: 30000
+- waitForAnimationToEnd
+- runFlow:
+    when:
+      visible:
+        id: "login-screen"
+    commands:
+      - assertVisible:
+          id: "login-screen"
+- runFlow:
+    when:
+      notVisible:
+        id: "login-screen"
+    commands:
+      - assertVisible:
+          id: "tab-home-icon"
+      - assertVisible:
+          id: "tab-categories-icon"
+
+# Prerequisite: User is logged in to the application
+- runFlow:
+    when:
+      visible:
+        id: "login-screen"
+    commands:
+      - tapOn:
+          id: "login-email-input"
+      - inputText: "user@easybuy.com"
+      - tapOn:
+          id: "login-password-input"
+      - inputText: "user123"
+      - hideKeyboard
+      - tapOn:
+          id: "login-submit-btn"
+      - waitForAnimationToEnd
+      - assertVisible:
+          id: "tab-home-icon"
+
+# AC 2 continued: Tabs navigator is displayed with the bottom tab bar visible
+# NOTE: tab icons resolved from Tabs.js (source lookup)
+- assertVisible:
+    id: "tab-home-icon"
+- assertVisible:
+    id: "tab-categories-icon"
+
+# AC 3: Tap the Home tab in the bottom tab navigator
+- tapOn:
+    id: "tab-home-icon"
+- assertVisible:
+    id: "home-screen"
+- assertVisible:
+    id: "home-scroll"
+
+# AC 4: Tap the first flight tile in the list on HomeScreen
+- extendedWaitUntil:
+    notVisible:
+      id: "new-arrivals-empty"
+    timeout: 30000
+- evalScript: ${output.scrollAttempt = 0}
+- repeat:
+    times: 10
+    while:
+      notVisible:
+        id: "new-arrivals-product-0"
+    commands:
+      - evalScript: ${output.scrollDuration = 50 + output.scrollAttempt * 50}
+      - swipe:
+          from:
+            id: "home-scroll"
+          direction: UP
+          duration: ${output.scrollDuration}
+      - evalScript: ${output.scrollAttempt = output.scrollAttempt + 1}
+- tapOn:
+    id: "new-arrivals-product-0"
+    below:
+      id: "new-arrivals-heading"
+    index: 0
+- waitForAnimationToEnd
+- assertVisible:
+    id: "product-detail-screen"
+# MANUAL REVIEW: flight-info-card elements are not present in dom_extract.json; asserting product-detail-image as top content proxy
+- assertVisible:
+    id: "product-detail-image"
+
+# AC 5: Verify STD local departure time on the flight info card
+# MANUAL REVIEW: flight-info-card elements are not present in dom_extract.json; asserting flightInfo.origin.scheduledDateTime.local from getFlight response
+- assertVisible: ".*${std_local}.*"
+
+# AC 6: Verify STA local arrival time on the flight info card
+# MANUAL REVIEW: flight-info-card elements are not present in dom_extract.json; asserting flightInfo.destination.scheduledDateTime.local from getFlight response
+- assertVisible: ".*${sta_local}.*"
+
+# AC 7: Verify ETD local departure time on the flight info card
+# MANUAL REVIEW: flight-info-card elements are not present in dom_extract.json; asserting flightInfo.origin.estimatedDateTime.local when present from getFlight response
+- assertVisible: ".*${etd_local}.*"
+
+# AC 8: Verify ETA local arrival time on the flight info card
+# MANUAL REVIEW: flight-info-card elements are not present in dom_extract.json; asserting flightInfo.destination.scheduledDateTime.local per acceptance criteria mapping
+- assertVisible: ".*${eta_local}.*"
+
+# AC 9: Verify STD, STA, ETD, and ETA GMT times on the flight info card
+# MANUAL REVIEW: flight-info-card elements are not present in dom_extract.json; asserting GMT times from getFlight response per acceptance criteria mapping
+- assertVisible: ".*${std_gmt}.*"
+- assertVisible: ".*${sta_gmt}.*"
+- assertVisible: ".*${etd_gmt}.*"
+- assertVisible: ".*${eta_gmt}.*"

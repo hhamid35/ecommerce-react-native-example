@@ -1,0 +1,110 @@
+appId: com.abidrazaa.EasyBuy
+name: "Flight Info Card - Departure and arrival gates when available"
+tags:
+    - flight-info-card-gates-when-available
+---
+
+# Prerequisites: User is logged in; originGate and destinationGate from getFlight API supplied via test execution env
+
+# AC 1: Launch the application
+- launchApp
+- assertVisible:
+    id: "splash-screen"
+
+# AC 2: Wait for application initialization to complete
+- extendedWaitUntil:
+    notVisible:
+      id: "splash-screen"
+    timeout: 30000
+- waitForAnimationToEnd
+- runFlow:
+    when:
+      visible:
+        id: "login-screen"
+    commands:
+      - assertVisible:
+          id: "login-screen"
+- runFlow:
+    when:
+      notVisible:
+        id: "login-screen"
+    commands:
+      - assertVisible:
+          id: "tab-home-icon"
+      - assertVisible:
+          id: "tab-categories-icon"
+
+# Prerequisite: User is logged in to the application
+- runFlow:
+    when:
+      visible:
+        id: "login-screen"
+    commands:
+      - tapOn:
+          id: "login-email-input"
+      - inputText: "user@easybuy.com"
+      - tapOn:
+          id: "login-password-input"
+      - inputText: "user123"
+      - hideKeyboard
+      - tapOn:
+          id: "login-submit-btn"
+      - waitForAnimationToEnd
+      - assertVisible:
+          id: "home-screen"
+      - assertVisible:
+          id: "tab-home-icon"
+
+# AC 2 continued: Tabs navigator is displayed with the bottom tab bar visible
+# NOTE: tab icons resolved from Tabs.js (source lookup)
+- assertVisible:
+    id: "tab-home-icon"
+- assertVisible:
+    id: "tab-categories-icon"
+
+# AC 3: Tap the Home tab in the bottom tab navigator
+- tapOn:
+    id: "tab-home-icon"
+- assertVisible:
+    id: "home-screen"
+- assertVisible:
+    id: "home-scroll"
+
+# AC 4: Tap a flight tile whose getFlight response includes origin and destination gate values
+- extendedWaitUntil:
+    notVisible:
+      id: "new-arrivals-empty"
+    timeout: 30000
+- evalScript: ${output.scrollAttempt = 0}
+- repeat:
+    times: 10
+    while:
+      notVisible:
+        id: "new-arrivals-product-0"
+    commands:
+      - swipe:
+          from:
+            id: "home-scroll"
+          direction: UP
+          duration: 400
+      - evalScript: ${output.scrollAttempt = output.scrollAttempt + 1}
+- assertVisible:
+    id: "new-arrivals-product-0"
+# MANUAL REVIEW: Flight list tile selectors are not present in dom_extract.json; tapping first visible product tile as flight list proxy
+- tapOn:
+    id: "new-arrivals-product-0"
+    below:
+      id: "new-arrivals-heading"
+    index: 0
+- waitForAnimationToEnd
+# MANUAL REVIEW: ProductDetailScreen used as flight detail screen; flight info card elements not in dom_extract.json
+- assertVisible:
+    id: "product-detail-screen"
+
+# AC 5: Verify the departure gate on the flight info card
+# MANUAL REVIEW: flight-info-card elements are not present in dom_extract.json; asserting flightInfo.origin.gate from getFlight response
+- assertVisible: ".*${originGate}.*"
+
+# AC 6: Verify the arrival gate on the flight info card
+# MANUAL REVIEW: flight-info-card elements are not present in dom_extract.json; asserting flightInfo.destination.gate from getFlight response
+- assertVisible: ".*${destinationGate}.*"

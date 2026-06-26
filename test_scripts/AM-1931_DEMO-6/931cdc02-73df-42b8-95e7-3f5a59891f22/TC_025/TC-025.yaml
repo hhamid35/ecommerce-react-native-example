@@ -1,0 +1,154 @@
+appId: com.abidrazaa.EasyBuy
+name: "Flight Info Card - Pull to refresh skeleton and data update"
+tags:
+    - flight-info-card-pull-refresh
+    - pull-to-refresh
+---
+
+# Prerequisites: User is logged in; at least one flight tile visible; getFlight data available via test execution env
+
+# AC 1: Launch the application
+- launchApp
+- assertVisible:
+    id: "splash-screen"
+
+# AC 2: Wait for application initialization to complete
+- extendedWaitUntil:
+    notVisible:
+      id: "splash-screen"
+    timeout: 30000
+- waitForAnimationToEnd
+- runFlow:
+    when:
+      visible:
+        id: "login-screen"
+    commands:
+      - assertVisible:
+          id: "login-screen"
+- runFlow:
+    when:
+      notVisible:
+        id: "login-screen"
+    commands:
+      - assertVisible:
+          id: "tab-home-icon"
+      - assertVisible:
+          id: "tab-categories-icon"
+
+# Prerequisite: User is logged in to the application
+- runFlow:
+    when:
+      visible:
+        id: "login-screen"
+    commands:
+      - tapOn:
+          id: "login-email-input"
+      - inputText: "user@easybuy.com"
+      - tapOn:
+          id: "login-password-input"
+      - inputText: "user123"
+      - hideKeyboard
+      - tapOn:
+          id: "login-submit-btn"
+      - waitForAnimationToEnd
+      - assertVisible:
+          id: "tab-home-icon"
+
+# AC 2 continued: Tabs navigator is displayed with the bottom tab bar visible
+# NOTE: tab icons resolved from Tabs.js (source lookup)
+- assertVisible:
+    id: "tab-home-icon"
+- assertVisible:
+    id: "tab-categories-icon"
+
+# AC 3: Tap the Home tab in the bottom tab navigator
+- tapOn:
+    id: "tab-home-icon"
+- assertVisible:
+    id: "home-screen"
+- assertVisible:
+    id: "home-scroll"
+
+# Prerequisite: At least one flight tile is visible in the flight list
+- extendedWaitUntil:
+    notVisible:
+      id: "new-arrivals-empty"
+    timeout: 30000
+
+# AC 4: Tap the first flight tile in the list on HomeScreen
+# MANUAL REVIEW: Flight list tile selectors are not present in dom_extract.json; using new-arrivals-product-0 as flight tile proxy
+- evalScript: ${output.scrollAttempt = 0}
+- repeat:
+    times: 10
+    while:
+      notVisible:
+        id: "new-arrivals-product-0"
+    commands:
+      - swipe:
+          from:
+            id: "home-scroll"
+          direction: UP
+          duration: 400
+      - evalScript: ${output.scrollAttempt = output.scrollAttempt + 1}
+- assertVisible:
+    id: "new-arrivals-product-0"
+- tapOn:
+    id: "new-arrivals-product-0"
+    below:
+      id: "new-arrivals-heading"
+    index: 0
+- waitForAnimationToEnd
+# MANUAL REVIEW: ProductDetailScreen used as flight detail screen; flight info card elements not in dom_extract.json
+- assertVisible:
+    id: "product-detail-screen"
+- assertVisible:
+    id: "product-detail-image"
+- assertVisible: ".*${airlineCode}.*"
+- assertVisible: ".*${flightNumber}.*"
+- assertVisible: ".*${originCode}.*"
+- assertVisible: ".*${destinationCode}.*"
+- evalScript: ${output.baselineAirlineCode = airlineCode}
+- evalScript: ${output.baselineFlightNumber = flightNumber}
+- evalScript: ${output.baselineOriginCode = originCode}
+- evalScript: ${output.baselineDestinationCode = destinationCode}
+- evalScript: ${output.baselineOverallStatus = overall_status_label}
+- evalScript: ${output.baselineDetailedStatus = detailed_status_code}
+
+# AC 5: Perform pull-down to refresh gesture on ProductDetailScreen
+# MANUAL REVIEW: getFlight query initiation cannot be verified directly in Maestro UI automation; pull-to-refresh triggers getFlight for selected flight
+# MANUAL REVIEW: ProductDetailScreen pull-to-refresh scroll container not in dom_extract.json; using product-detail-screen as swipe anchor
+- swipe:
+    from:
+      id: "product-detail-screen"
+    direction: DOWN
+    duration: 400
+
+# AC 6: Observe the flight info card during the refresh request
+# MANUAL REVIEW: flight-info-skeleton testID not in dom_extract.json; skeleton id supplied via test execution env as flight_info_skeleton_id
+- extendedWaitUntil:
+    visible:
+      id: "${flight_info_skeleton_id}"
+    timeout: 5000
+# Skeleton placeholder displays briefly, then cached flight info card data is shown while new data is being retrieved
+- assertVisible: ".*${airlineCode}.*"
+- assertVisible: ".*${flightNumber}.*"
+- assertVisible: ".*${originCode}.*"
+- assertVisible: ".*${destinationCode}.*"
+- assertVisible: ".*${overall_status_label}.*"
+- assertVisible: ".*${detailed_status_code}.*"
+
+# AC 7: Wait for the getFlight refresh to complete
+# MANUAL REVIEW: flight-info-card elements are not present in dom_extract.json; waiting for refreshed getFlight values from test execution env
+- extendedWaitUntil:
+    visible: ".*${refreshed_overall_status_label}.*"
+    timeout: 30000
+- assertVisible:
+    id: "product-detail-screen"
+- assertNotVisible:
+    id: "${flight_info_skeleton_id}"
+- assertVisible: ".*${refreshed_airlineCode}.*"
+- assertVisible: ".*${refreshed_flightNumber}.*"
+- assertVisible: ".*${refreshed_originCode}.*"
+- assertVisible: ".*${refreshed_destinationCode}.*"
+- assertVisible: ".*${refreshed_overall_status_label}.*"
+- assertVisible: ".*${refreshed_detailed_status_code}.*"

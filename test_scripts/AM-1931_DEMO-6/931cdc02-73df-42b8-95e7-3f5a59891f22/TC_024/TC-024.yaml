@@ -1,0 +1,135 @@
+appId: com.abidrazaa.EasyBuy
+name: "Flight Info Card - Background kill and foreground refetch"
+tags:
+    - flight-info-card-background-refetch
+    - foreground-refetch
+---
+
+# Prerequisites: User is logged in; at least one flight tile visible; getFlight data available via test execution env
+
+# AC 1: Launch the application
+- launchApp
+- assertVisible:
+    id: "splash-screen"
+
+# AC 2: Wait for application initialization to complete
+- extendedWaitUntil:
+    notVisible:
+      id: "splash-screen"
+    timeout: 30000
+- waitForAnimationToEnd
+- runFlow:
+    when:
+      visible:
+        id: "login-screen"
+    commands:
+      - assertVisible:
+          id: "login-screen"
+- runFlow:
+    when:
+      notVisible:
+        id: "login-screen"
+    commands:
+      - assertVisible:
+          id: "tab-home-icon"
+      - assertVisible:
+          id: "tab-categories-icon"
+
+# Prerequisite: User is logged in to the application
+- runFlow:
+    when:
+      visible:
+        id: "login-screen"
+    commands:
+      - tapOn:
+          id: "login-email-input"
+      - inputText: "user@easybuy.com"
+      - tapOn:
+          id: "login-password-input"
+      - inputText: "user123"
+      - hideKeyboard
+      - tapOn:
+          id: "login-submit-btn"
+      - waitForAnimationToEnd
+      - assertVisible:
+          id: "tab-home-icon"
+
+# AC 2 continued: Tabs navigator is displayed with the bottom tab bar visible
+# NOTE: tab icons resolved from Tabs.js (source lookup)
+- assertVisible:
+    id: "tab-home-icon"
+- assertVisible:
+    id: "tab-categories-icon"
+
+# AC 3: Tap the Home tab in the bottom tab navigator
+- tapOn:
+    id: "tab-home-icon"
+- assertVisible:
+    id: "home-screen"
+- assertVisible:
+    id: "home-scroll"
+
+# Prerequisite: At least one flight tile is visible in the flight list
+- extendedWaitUntil:
+    notVisible:
+      id: "new-arrivals-empty"
+    timeout: 30000
+
+# AC 4: Tap the first flight tile in the list on HomeScreen
+# MANUAL REVIEW: Flight list tile selectors are not present in dom_extract.json; using new-arrivals-product-0 as flight tile proxy
+- evalScript: ${output.scrollAttempt = 0}
+- repeat:
+    times: 10
+    while:
+      notVisible:
+        id: "new-arrivals-product-0"
+    commands:
+      - swipe:
+          from:
+            id: "home-scroll"
+          direction: UP
+          duration: 400
+      - evalScript: ${output.scrollAttempt = output.scrollAttempt + 1}
+- assertVisible:
+    id: "new-arrivals-product-0"
+- tapOn:
+    id: "new-arrivals-product-0"
+    below:
+      id: "new-arrivals-heading"
+    index: 0
+- waitForAnimationToEnd
+# MANUAL REVIEW: ProductDetailScreen used as flight detail screen; flight info card elements not in dom_extract.json
+- assertVisible:
+    id: "product-detail-screen"
+- assertVisible:
+    id: "product-detail-image"
+- assertVisible: ".*${airlineCode}.*"
+- assertVisible: ".*${flightNumber}.*"
+- assertVisible: ".*${originCode}.*"
+- assertVisible: ".*${destinationCode}.*"
+- evalScript: ${output.baselineAirlineCode = airlineCode}
+- evalScript: ${output.baselineFlightNumber = flightNumber}
+- evalScript: ${output.baselineOriginCode = originCode}
+- evalScript: ${output.baselineDestinationCode = destinationCode}
+
+# AC 5: Send the application to the background
+# MANUAL REVIEW: flightUpdated subscription termination cannot be verified directly in Maestro UI automation
+- pressKey: Home
+
+# AC 6: Bring the application back to the foreground on ProductDetailScreen
+- launchApp
+- waitForAnimationToEnd
+- assertVisible:
+    id: "product-detail-screen"
+
+# AC 7: Verify initial data fetch and subscription re-establishment
+# MANUAL REVIEW: flightUpdated subscription re-establishment cannot be verified directly in Maestro; asserting getFlight data is refetched and displayed on foreground return
+- extendedWaitUntil:
+    visible: ".*${airlineCode}.*"
+    timeout: 30000
+- assertVisible: ".*${airlineCode}.*"
+- assertVisible: ".*${flightNumber}.*"
+- assertVisible: ".*${originCode}.*"
+- assertVisible: ".*${destinationCode}.*"
+- assertVisible:
+    id: "product-detail-image"
