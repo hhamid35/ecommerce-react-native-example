@@ -26,6 +26,7 @@ const AddProductScreen = ({ navigation, route }) => {
   const [title, setTitle] = useState("");
   const [price, setPrice] = useState("");
   const [sku, setSku] = useState("");
+  const [externalIds, setExternalIds] = useState("");
   const [image, setImage] = useState("");
   const [error, setError] = useState("");
   const [quantity, setQuantity] = useState("");
@@ -122,6 +123,7 @@ const AddProductScreen = ({ navigation, route }) => {
   var raw = JSON.stringify({
     title: title,
     sku: sku,
+    externalIds: externalIds,
     price: price,
     image: image,
     description: description,
@@ -254,6 +256,14 @@ const AddProductScreen = ({ navigation, route }) => {
             placeholderTextColor={colors.muted}
             radius={5}
             testID="add-product-sku-input"
+          />
+          <CustomInput
+            value={externalIds}
+            setValue={setExternalIds}
+            placeholder={"External IDs (barcodes), comma-separated"}
+            placeholderTextColor={colors.muted}
+            radius={5}
+            testID="add-product-externalids-input"
           />
           <CustomInput
             value={title}

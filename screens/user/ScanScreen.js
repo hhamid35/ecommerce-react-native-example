@@ -12,6 +12,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { colors } from "../../constants";
 import CustomButton from "../../components/CustomButton/CustomButton";
 import { lookupProductByCode } from "../../utils/productLookup";
+import { track, SCAN_EVENTS } from "../../utils/scanAnalytics";
 
 const BARCODE_TYPES = [
   "qr",
@@ -31,6 +32,7 @@ const ScanScreen = ({ navigation }) => {
   const [scanLock, setScanLock] = useState(false);
   const [networkError, setNetworkError] = useState(null);
   const cooldownRef = useRef(null);
+  const scanStartedRef = useRef(false);
 
   const permissionStatus = permission?.status ?? "undetermined";
 
@@ -39,6 +41,16 @@ const ScanScreen = ({ navigation }) => {
       requestPermission();
     }
   }, [permissionStatus, requestPermission]);
+
+  useEffect(() => {
+    if (permissionStatus === "granted" && !scanStartedRef.current) {
+      scanStartedRef.current = true;
+      track(SCAN_EVENTS.STARTED, {});
+    }
+    if (permissionStatus === "denied") {
+      track(SCAN_EVENTS.PERMISSION_DENIED, {});
+    }
+  }, [permissionStatus]);
 
   useEffect(() => {
     return () => {
@@ -68,6 +80,15 @@ const ScanScreen = ({ navigation }) => {
 
       if (result.status === "found") {
         navigation.navigate("productdetail", { product: result.product });
+        releaseScanLock();
+        return;
+      }
+
+      if (result.status === "multiple") {
+        navigation.navigate("scanmatches", {
+          matches: result.matches,
+          scannedCode: result.scannedCode,
+        });
         releaseScanLock();
         return;
       }
@@ -114,7 +135,6 @@ const ScanScreen = ({ navigation }) => {
   }
 
   if (permissionStatus === "denied") {
-    console.log("scan_permission_denied");
     return (
       <View style={styles.centered} testID="scan-screen">
         <View style={styles.deniedContent} testID="scan-permission-denied">
