@@ -25,6 +25,7 @@ const EditProductScreen = ({ navigation, route }) => {
   const [title, setTitle] = useState("");
   const [price, setPrice] = useState("");
   const [sku, setSku] = useState("");
+  const [externalIds, setExternalIds] = useState("");
   const [image, setImage] = useState("");
   const [error, setError] = useState("");
   const [quantity, setQuantity] = useState("");
@@ -39,6 +40,7 @@ const EditProductScreen = ({ navigation, route }) => {
   var raw = JSON.stringify({
     title: title,
     sku: sku,
+    externalIds: externalIds,
     price: price,
     image: image,
     description: description,
@@ -97,6 +99,7 @@ const EditProductScreen = ({ navigation, route }) => {
             setPrice("");
             setQuantity("");
             setSku("");
+            setExternalIds("");
             setTitle("");
           }
         })
@@ -113,6 +116,7 @@ const EditProductScreen = ({ navigation, route }) => {
     setImage(`${network.serverip}/uploads/${product?.image}`);
     setTitle(product.title);
     setSku(product.sku);
+    setExternalIds((product.externalIds || []).join(", "));
     setQuantity(product.quantity.toString());
     setPrice(product.price.toString());
     setDescription(product.description);
@@ -170,6 +174,14 @@ const EditProductScreen = ({ navigation, route }) => {
             placeholderTextColor={colors.muted}
             radius={5}
             testID="edit-product-sku-input"
+          />
+          <CustomInput
+            value={externalIds}
+            setValue={setExternalIds}
+            placeholder={"External IDs (barcodes), comma-separated"}
+            placeholderTextColor={colors.muted}
+            radius={5}
+            testID="edit-product-externalids-input"
           />
           <CustomInput
             value={title}
