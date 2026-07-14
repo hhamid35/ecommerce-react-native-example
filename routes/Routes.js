@@ -23,6 +23,7 @@ import ViewCategoryScreen from "../screens/admin/ViewCategoryScreen";
 import AddCategoryScreen from "../screens/admin/AddCategoryScreen";
 import ViewUsersScreen from "../screens/admin/ViewUsersScreen";
 import CategoriesScreen from "../screens/user/CategoriesScreen";
+import ScanProductScreen from "../screens/user/ScanProductScreen";
 import EditCategoryScreen from "../screens/admin/EditCategoryScreen";
 import MyWishlistScreen from "../screens/profile/MyWishlistScreen";
 
@@ -51,6 +52,7 @@ const Routes = () => {
         <Stack.Screen name="checkout" component={CheckoutScreen} />
         <Stack.Screen name="orderconfirm" component={OrderConfirmScreen} />
         <Stack.Screen name="productdetail" component={ProductDetailScreen} />
+        <Stack.Screen name="scanproduct" component={ScanProductScreen} />
         <Stack.Screen name="vieworder" component={ViewOrdersScreen} />
         <Stack.Screen
           name="vieworderdetails"

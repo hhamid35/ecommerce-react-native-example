@@ -9,6 +9,7 @@ const ProductList = ({
   title,
   image,
   qantity,
+  externalId,
   onPressView,
   onPressEdit,
   onPressDelete,
@@ -38,6 +39,12 @@ const ProductList = ({
             <Text style={styles.productInfoItemText}>SKU: </Text>
             <Text testID={testID ? `${testID}-sku` : undefined}>{qantity <= 0 ? "Out of Stock" : qantity}</Text>
           </View>
+          {externalId ? (
+            <View style={styles.productInfoItem}>
+              <Text style={styles.productInfoItemText}>External ID: </Text>
+              <Text testID="view-product-external-id">{externalId}</Text>
+            </View>
+          ) : null}
         </View>
       </View>
       <View style={styles.buttonContainer}>

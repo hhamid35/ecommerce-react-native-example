@@ -44,6 +44,10 @@ const HomeScreen = ({ navigation, route }) => {
     navigation.navigate("productdetail", { product: product });
   };
 
+  const handleScanPress = () => {
+    navigation.navigate("scanproduct", { returnRoute: "home" });
+  };
+
   //method to add to cart (redux)
   const handleAddToCat = (product) => {
     addCartItem(product);
@@ -98,6 +102,7 @@ const HomeScreen = ({ navigation, route }) => {
         <SearchBar
           searchItems={searchItems}
           handleProductPress={handleProductPress}
+          handleScanPress={handleScanPress}
         />
         <ScrollView nestedScrollEnabled={true} testID="home-scroll">
           <PromotionSlider slides={slides} />

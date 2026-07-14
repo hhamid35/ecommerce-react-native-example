@@ -79,6 +79,7 @@ let products = [
     _id: "prod001",
     title: "Classic White T-Shirt",
     sku: "GAR-001",
+    externalId: "012345678905",
     price: 19.99,
     quantity: 50,
     description: "A comfortable everyday white t-shirt made from 100% cotton.",
@@ -92,6 +93,7 @@ let products = [
     _id: "prod002",
     title: "Blue Denim Jeans",
     sku: "GAR-002",
+    externalId: null,
     price: 49.99,
     quantity: 30,
     description: "Slim-fit blue denim jeans for a modern look.",
@@ -105,6 +107,7 @@ let products = [
     _id: "prod003",
     title: "Wireless Bluetooth Headphones",
     sku: "ELC-001",
+    externalId: null,
     price: 89.99,
     quantity: 20,
     description: "High-quality wireless headphones with noise cancellation.",
@@ -118,6 +121,7 @@ let products = [
     _id: "prod004",
     title: "Smartphone Stand",
     sku: "ELC-002",
+    externalId: null,
     price: 14.99,
     quantity: 100,
     description: "Adjustable aluminum smartphone and tablet stand.",
@@ -131,6 +135,7 @@ let products = [
     _id: "prod005",
     title: "Face Moisturizer SPF 30",
     sku: "COS-001",
+    externalId: null,
     price: 24.99,
     quantity: 60,
     description: "Daily face moisturizer with SPF 30 sun protection.",
@@ -144,6 +149,7 @@ let products = [
     _id: "prod006",
     title: "Lipstick Set (6 Colors)",
     sku: "COS-002",
+    externalId: null,
     price: 34.99,
     quantity: 40,
     description: "Long-lasting matte lipstick set in 6 vibrant shades.",
@@ -157,6 +163,7 @@ let products = [
     _id: "prod007",
     title: "Organic Basmati Rice (5kg)",
     sku: "GRO-001",
+    externalId: null,
     price: 12.99,
     quantity: 200,
     description: "Premium organic basmati rice, long grain and aromatic.",
@@ -170,6 +177,7 @@ let products = [
     _id: "prod008",
     title: "Extra Virgin Olive Oil (1L)",
     sku: "GRO-002",
+    externalId: null,
     price: 18.99,
     quantity: 80,
     description: "Cold-pressed extra virgin olive oil from Mediterranean farms.",
@@ -305,6 +313,60 @@ const adminMiddleware = (req, res, next) => {
   });
 };
 
+// ─── Scan lookup helpers ─────────────────────────────────────────────────────
+
+const normalizeLookupCode = (code) => {
+  if (code === undefined || code === null) {
+    return "";
+  }
+  return String(code).trim().toLowerCase();
+};
+
+const findProductsByScanCode = (code) => {
+  const normalized = normalizeLookupCode(code);
+  if (!normalized) {
+    return { matches: [], matchedBy: null };
+  }
+
+  const skuMatches = products.filter(
+    (p) => p.sku && normalizeLookupCode(p.sku) === normalized
+  );
+  if (skuMatches.length > 0) {
+    return { matches: skuMatches, matchedBy: "sku" };
+  }
+
+  const externalMatches = products.filter(
+    (p) => p.externalId && normalizeLookupCode(p.externalId) === normalized
+  );
+  if (externalMatches.length > 0) {
+    return { matches: externalMatches, matchedBy: "externalId" };
+  }
+
+  return { matches: [], matchedBy: null };
+};
+
+const hasDuplicateIdentifier = (candidate, existingProductId) => {
+  const normalizedSku = candidate.sku ? normalizeLookupCode(candidate.sku) : "";
+  const normalizedExternalId = candidate.externalId
+    ? normalizeLookupCode(candidate.externalId)
+    : "";
+
+  return products.some((product) => {
+    if (existingProductId && product._id === existingProductId) {
+      return false;
+    }
+    const skuConflict =
+      normalizedSku &&
+      product.sku &&
+      normalizeLookupCode(product.sku) === normalizedSku;
+    const externalConflict =
+      normalizedExternalId &&
+      product.externalId &&
+      normalizeLookupCode(product.externalId) === normalizedExternalId;
+    return skuConflict || externalConflict;
+  });
+};
+
 // ─── Routes ───────────────────────────────────────────────────────────────────
 
 // POST /register
@@ -345,17 +407,85 @@ app.get("/products", (req, res) => {
   res.json({ success: true, data: products });
 });
 
+// GET /products/scan-lookup
+app.get("/products/scan-lookup", (req, res) => {
+  const { code } = req.query;
+  const trimmedCode = code !== undefined && code !== null ? String(code).trim() : "";
+
+  if (!trimmedCode) {
+    console.log({ route: "/products/scan-lookup", matchedBy: null, status: 400 });
+    return res.status(400).json({
+      success: false,
+      message: "Scan code is required",
+      data: null,
+    });
+  }
+
+  if (trimmedCode.length > 256) {
+    console.log({ route: "/products/scan-lookup", matchedBy: null, status: 400 });
+    return res.status(400).json({
+      success: false,
+      message: "Scan code is required",
+      data: null,
+    });
+  }
+
+  const { matches, matchedBy } = findProductsByScanCode(trimmedCode);
+
+  if (matches.length === 0) {
+    console.log({ route: "/products/scan-lookup", matchedBy: null, status: 404 });
+    return res.status(404).json({
+      success: false,
+      message: "No product matched this code",
+      data: null,
+    });
+  }
+
+  if (matches.length > 1) {
+    console.log({ route: "/products/scan-lookup", matchedBy: matchedBy, status: 409 });
+    return res.status(409).json({
+      success: false,
+      message: "Multiple products matched this code",
+      data: null,
+    });
+  }
+
+  console.log({ route: "/products/scan-lookup", matchedBy, status: 200 });
+  return res.json({
+    success: true,
+    message: "Product found",
+    data: matches[0],
+    meta: {
+      matchedBy,
+      code: trimmedCode,
+    },
+  });
+});
+
 // POST /product  (admin: add product)
 app.post("/product", adminMiddleware, (req, res) => {
-  const { title, sku, price, image, description, category, quantity } = req.body;
+  const { title, sku, externalId, price, image, description, category, quantity } = req.body;
   if (!title || !price) {
     return res.status(400).json({ success: false, message: "Title and price are required" });
   }
+
+  const candidate = {
+    sku: sku || "",
+    externalId: externalId || null,
+  };
+  if (hasDuplicateIdentifier(candidate)) {
+    return res.status(400).json({
+      success: false,
+      message: "Product SKU or external ID must be unique",
+    });
+  }
+
   const cat = categories.find((c) => c._id === category);
   const newProduct = {
     _id: uuidv4(),
     title,
     sku: sku || "",
+    externalId: externalId || null,
     price: parseFloat(price),
     quantity: parseInt(quantity) || 0,
     description: description || "",
@@ -373,12 +503,29 @@ app.post("/update-product", adminMiddleware, (req, res) => {
   if (idx === -1) {
     return res.status(404).json({ success: false, message: "Product not found" });
   }
-  const { title, sku, price, image, description, category, quantity } = req.body;
+  const { title, sku, externalId, price, image, description, category, quantity } = req.body;
   const cat = categories.find((c) => c._id === category);
+
+  const nextSku = sku !== undefined ? sku : products[idx].sku;
+  const nextExternalId =
+    externalId !== undefined ? externalId || null : products[idx].externalId;
+
+  const candidate = {
+    sku: nextSku,
+    externalId: nextExternalId,
+  };
+  if (hasDuplicateIdentifier(candidate, id)) {
+    return res.status(400).json({
+      success: false,
+      message: "Product SKU or external ID must be unique",
+    });
+  }
+
   products[idx] = {
     ...products[idx],
     title: title || products[idx].title,
-    sku: sku || products[idx].sku,
+    sku: nextSku,
+    externalId: nextExternalId,
     price: price ? parseFloat(price) : products[idx].price,
     quantity: quantity !== undefined ? parseInt(quantity) : products[idx].quantity,
     description: description || products[idx].description,
@@ -601,6 +748,7 @@ app.listen(PORT, "0.0.0.0", () => {
   console.log(`   POST   /register`);
   console.log(`   POST   /login`);
   console.log(`   GET    /products`);
+  console.log(`   GET    /products/scan-lookup`);
   console.log(`   POST   /product              (admin)`);
   console.log(`   POST   /update-product?id=   (admin)`);
   console.log(`   GET    /delete-product?id=   (admin)`);

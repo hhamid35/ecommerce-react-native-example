@@ -202,6 +202,7 @@ const ViewProductScreen = ({ navigation, route }) => {
                 category={product?.category?.title}
                 price={product?.price}
                 qantity={product?.sku}
+                externalId={product?.externalId}
                 onPressView={() => {
                   console.log("view is working " + product._id);
                 }}
