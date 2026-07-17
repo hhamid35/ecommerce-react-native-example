@@ -74,6 +74,9 @@ const EditProductScreen = ({ navigation, route }) => {
     if (title == "") {
       setError("Please enter the product title");
       setIsloading(false);
+    } else if (sku.trim() === "") {
+      setError("Please enter the product SKU");
+      setIsloading(false);
     } else if (price == 0) {
       setError("Please enter the product price");
       setIsloading(false);

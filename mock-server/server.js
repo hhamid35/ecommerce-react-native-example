@@ -3,6 +3,12 @@ const cors = require("cors");
 const multer = require("multer");
 const path = require("path");
 const { v4: uuidv4 } = require("uuid");
+const {
+  normalizeScanValue,
+  extractApprovedSku,
+  findProductsBySku,
+  hasDuplicateSku,
+} = require("./scanIdentifier");
 
 const app = express();
 const PORT = 3002;
@@ -345,11 +351,74 @@ app.get("/products", (req, res) => {
   res.json({ success: true, data: products });
 });
 
+// GET /products/resolve-scan
+app.get("/products/resolve-scan", (req, res) => {
+  const { value, format } = req.query;
+  const rawValue = value == null ? "" : String(value);
+
+  if (!rawValue.trim()) {
+    console.log("scan_lookup_rejected", { status: 400, reason: "empty_value" });
+    return res.status(400).json({ success: false, message: "Scanned code is empty" });
+  }
+
+  const approvedSku = extractApprovedSku(rawValue);
+  if (!approvedSku) {
+    console.log("scan_lookup_rejected", {
+      status: 400,
+      reason: "unsupported_payload",
+      format: format || null,
+    });
+    return res
+      .status(400)
+      .json({ success: false, message: "Scanned code is not an approved product identifier" });
+  }
+
+  console.log("scan_lookup_started", {
+    format: format || null,
+    identifierType: "sku",
+  });
+
+  const matches = findProductsBySku(products, approvedSku);
+
+  if (matches.length === 0) {
+    console.log("scan_lookup_not_found", { status: 404, identifierType: "sku" });
+    return res.status(404).json({ success: false, message: "No product found for this code" });
+  }
+
+  if (matches.length > 1) {
+    console.log("scan_lookup_ambiguous", { status: 409, identifierType: "sku" });
+    return res.status(409).json({
+      success: false,
+      message: "Multiple products match this code. Please search manually.",
+    });
+  }
+
+  const product = matches[0];
+  console.log("scan_lookup_success", { status: 200, productId: product._id });
+
+  res.json({
+    success: true,
+    message: "Product found",
+    data: product,
+    scan: {
+      identifierType: "sku",
+      normalizedValue: normalizeScanValue(approvedSku),
+      format: format || null,
+    },
+  });
+});
+
 // POST /product  (admin: add product)
 app.post("/product", adminMiddleware, (req, res) => {
   const { title, sku, price, image, description, category, quantity } = req.body;
   if (!title || !price) {
     return res.status(400).json({ success: false, message: "Title and price are required" });
+  }
+  if (!sku || String(sku).trim() === "") {
+    return res.status(400).json({ success: false, message: "SKU is required" });
+  }
+  if (hasDuplicateSku(products, sku)) {
+    return res.status(400).json({ success: false, message: "A product with this SKU already exists" });
   }
   const cat = categories.find((c) => c._id === category);
   const newProduct = {
@@ -375,6 +444,13 @@ app.post("/update-product", adminMiddleware, (req, res) => {
   }
   const { title, sku, price, image, description, category, quantity } = req.body;
   const cat = categories.find((c) => c._id === category);
+  const nextSku = sku || products[idx].sku;
+  if (!nextSku || String(nextSku).trim() === "") {
+    return res.status(400).json({ success: false, message: "SKU is required" });
+  }
+  if (hasDuplicateSku(products, nextSku, id)) {
+    return res.status(400).json({ success: false, message: "A product with this SKU already exists" });
+  }
   products[idx] = {
     ...products[idx],
     title: title || products[idx].title,
@@ -601,6 +677,7 @@ app.listen(PORT, "0.0.0.0", () => {
   console.log(`   POST   /register`);
   console.log(`   POST   /login`);
   console.log(`   GET    /products`);
+  console.log(`   GET    /products/resolve-scan`);
   console.log(`   POST   /product              (admin)`);
   console.log(`   POST   /update-product?id=   (admin)`);
   console.log(`   GET    /delete-product?id=   (admin)`);
