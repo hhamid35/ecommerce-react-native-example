@@ -31,6 +31,7 @@ const AddProductScreen = ({ navigation, route }) => {
   const [quantity, setQuantity] = useState("");
   const [description, setDescription] = useState("");
   const [category, setCategory] = useState("");
+  const [externalIds, setExternalIds] = useState("");
   const [alertType, setAlertType] = useState("error");
   const [user, setUser] = useState({});
   const [categories, setCategories] = useState([]);
@@ -127,6 +128,7 @@ const AddProductScreen = ({ navigation, route }) => {
     description: description,
     category: category,
     quantity: quantity,
+    externalIds: externalIds,
   });
 
   var requestOptions = {
@@ -254,6 +256,14 @@ const AddProductScreen = ({ navigation, route }) => {
             placeholderTextColor={colors.muted}
             radius={5}
             testID="add-product-sku-input"
+          />
+          <CustomInput
+            value={externalIds}
+            setValue={setExternalIds}
+            placeholder={"External IDs, comma separated"}
+            placeholderTextColor={colors.muted}
+            radius={5}
+            testID="add-product-external-ids-input"
           />
           <CustomInput
             value={title}

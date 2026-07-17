@@ -5,8 +5,7 @@ import {
   ScrollView,
 } from "react-native";
 import React, { useEffect, useState } from "react";
-import { colors } from "../../constants";
-import { network } from "../../constants";
+import { colors, network, featureFlags } from "../../constants";
 import { useSelector, useDispatch } from "react-redux";
 import { bindActionCreators } from "redux";
 import * as actionCreaters from "../../states/actionCreaters/actionCreaters";
@@ -42,6 +41,10 @@ const HomeScreen = ({ navigation, route }) => {
   //method to navigate to product detail screen of a specific product
   const handleProductPress = (product) => {
     navigation.navigate("productdetail", { product: product });
+  };
+
+  const handleScanPress = () => {
+    navigation.navigate("scanproduct", { returnTo: "home" });
   };
 
   //method to add to cart (redux)
@@ -98,6 +101,8 @@ const HomeScreen = ({ navigation, route }) => {
         <SearchBar
           searchItems={searchItems}
           handleProductPress={handleProductPress}
+          handleScanPress={handleScanPress}
+          scanEnabled={featureFlags.scanToProductEnabled}
         />
         <ScrollView nestedScrollEnabled={true} testID="home-scroll">
           <PromotionSlider slides={slides} />

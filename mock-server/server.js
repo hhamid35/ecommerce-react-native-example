@@ -4,6 +4,12 @@ const multer = require("multer");
 const path = require("path");
 const { v4: uuidv4 } = require("uuid");
 
+const {
+  normalizeExternalIds,
+  findProductByScanCode,
+  validateUniqueIdentifiers,
+} = require("./productLookup");
+
 const app = express();
 const PORT = 3002;
 
@@ -87,6 +93,7 @@ let products = [
       _id: "62fe244f58f7aa8230817f89",
       title: "Garments",
     },
+    externalIds: ["EB-GAR-001"],
   },
   {
     _id: "prod002",
@@ -100,6 +107,7 @@ let products = [
       _id: "62fe244f58f7aa8230817f89",
       title: "Garments",
     },
+    externalIds: ["EB-GAR-002"],
   },
   {
     _id: "prod003",
@@ -113,6 +121,7 @@ let products = [
       _id: "62fe243858f7aa8230817f86",
       title: "Electronics",
     },
+    externalIds: ["EB-ELC-001"],
   },
   {
     _id: "prod004",
@@ -126,6 +135,7 @@ let products = [
       _id: "62fe243858f7aa8230817f86",
       title: "Electronics",
     },
+    externalIds: ["EB-ELC-002"],
   },
   {
     _id: "prod005",
@@ -139,6 +149,7 @@ let products = [
       _id: "62fe241958f7aa8230817f83",
       title: "Cosmetics",
     },
+    externalIds: ["EB-COS-001"],
   },
   {
     _id: "prod006",
@@ -152,6 +163,7 @@ let products = [
       _id: "62fe241958f7aa8230817f83",
       title: "Cosmetics",
     },
+    externalIds: ["EB-COS-002"],
   },
   {
     _id: "prod007",
@@ -165,6 +177,7 @@ let products = [
       _id: "62fe246858f7aa8230817f8c",
       title: "Groceries",
     },
+    externalIds: ["EB-GRO-001"],
   },
   {
     _id: "prod008",
@@ -178,6 +191,7 @@ let products = [
       _id: "62fe246858f7aa8230817f8c",
       title: "Groceries",
     },
+    externalIds: ["EB-GRO-002"],
   },
 ];
 
@@ -345,12 +359,103 @@ app.get("/products", (req, res) => {
   res.json({ success: true, data: products });
 });
 
+// GET /products/resolve?code=&type=
+app.get("/products/resolve", (req, res) => {
+  const startedAt = Date.now();
+  const code = req.query.code || "";
+  const codeType = req.query.type || null;
+
+  const lookup = findProductByScanCode(products, code);
+  const durationMs = Date.now() - startedAt;
+
+  if (lookup.status === "invalid") {
+    console.log(
+      JSON.stringify({
+        event: "scan_lookup",
+        codeType,
+        result: "invalid",
+        matchField: null,
+        durationMs,
+      })
+    );
+    return res.status(400).json({
+      success: false,
+      message: "Scan code is required",
+    });
+  }
+
+  if (lookup.status === "duplicate") {
+    console.log(
+      JSON.stringify({
+        event: "scan_lookup",
+        codeType,
+        result: "duplicate",
+        matchField: null,
+        durationMs,
+      })
+    );
+    return res.status(409).json({
+      success: false,
+      message: "Multiple products matched scanned code",
+    });
+  }
+
+  if (lookup.status === "not_found") {
+    console.log(
+      JSON.stringify({
+        event: "scan_lookup",
+        codeType,
+        result: "not_found",
+        matchField: null,
+        durationMs,
+      })
+    );
+    return res.status(404).json({
+      success: false,
+      message: "No product found for scanned code",
+      data: null,
+      scan: { code, type: codeType },
+    });
+  }
+
+  console.log(
+    JSON.stringify({
+      event: "scan_lookup",
+      codeType,
+      result: "matched",
+      matchField: lookup.match.field,
+      durationMs,
+    })
+  );
+
+  return res.status(200).json({
+    success: true,
+    data: lookup.product,
+    match: {
+      field: lookup.match.field,
+      value: lookup.match.value,
+      codeType,
+    },
+  });
+});
+
 // POST /product  (admin: add product)
 app.post("/product", adminMiddleware, (req, res) => {
-  const { title, sku, price, image, description, category, quantity } = req.body;
+  const { title, sku, price, image, description, category, quantity, externalIds } =
+    req.body;
   if (!title || !price) {
     return res.status(400).json({ success: false, message: "Title and price are required" });
   }
+
+  const normalizedExternalIds = normalizeExternalIds(externalIds);
+  const uniqueness = validateUniqueIdentifiers(products, {
+    sku: sku || "",
+    externalIds: normalizedExternalIds,
+  });
+  if (!uniqueness.valid) {
+    return res.status(400).json({ success: false, message: uniqueness.message });
+  }
+
   const cat = categories.find((c) => c._id === category);
   const newProduct = {
     _id: uuidv4(),
@@ -361,6 +466,7 @@ app.post("/product", adminMiddleware, (req, res) => {
     description: description || "",
     image: image || "default.png",
     category: cat ? { _id: cat._id, title: cat.title } : { _id: category, title: "Unknown" },
+    externalIds: normalizedExternalIds,
   };
   products.push(newProduct);
   res.json({ success: true, message: "Product added successfully", data: newProduct });
@@ -373,7 +479,24 @@ app.post("/update-product", adminMiddleware, (req, res) => {
   if (idx === -1) {
     return res.status(404).json({ success: false, message: "Product not found" });
   }
-  const { title, sku, price, image, description, category, quantity } = req.body;
+  const { title, sku, price, image, description, category, quantity, externalIds } = req.body;
+  const normalizedExternalIds =
+    externalIds !== undefined
+      ? normalizeExternalIds(externalIds)
+      : products[idx].externalIds || [];
+
+  const uniqueness = validateUniqueIdentifiers(
+    products,
+    {
+      sku: sku || products[idx].sku,
+      externalIds: normalizedExternalIds,
+    },
+    id
+  );
+  if (!uniqueness.valid) {
+    return res.status(400).json({ success: false, message: uniqueness.message });
+  }
+
   const cat = categories.find((c) => c._id === category);
   products[idx] = {
     ...products[idx],
@@ -384,6 +507,7 @@ app.post("/update-product", adminMiddleware, (req, res) => {
     description: description || products[idx].description,
     image: image || products[idx].image,
     category: cat ? { _id: cat._id, title: cat.title } : products[idx].category,
+    externalIds: normalizedExternalIds,
   };
   res.json({ success: true, message: "Product updated successfully", data: products[idx] });
 });
@@ -601,6 +725,7 @@ app.listen(PORT, "0.0.0.0", () => {
   console.log(`   POST   /register`);
   console.log(`   POST   /login`);
   console.log(`   GET    /products`);
+  console.log(`   GET    /products/resolve?code=&type=`);
   console.log(`   POST   /product              (admin)`);
   console.log(`   POST   /update-product?id=   (admin)`);
   console.log(`   GET    /delete-product?id=   (admin)`);

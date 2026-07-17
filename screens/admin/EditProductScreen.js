@@ -30,6 +30,7 @@ const EditProductScreen = ({ navigation, route }) => {
   const [quantity, setQuantity] = useState("");
   const [description, setDescription] = useState("");
   const [category, setCategory] = useState("garments");
+  const [externalIds, setExternalIds] = useState("");
   const [alertType, setAlertType] = useState("error");
 
   var myHeaders = new Headers();
@@ -44,6 +45,7 @@ const EditProductScreen = ({ navigation, route }) => {
     description: description,
     category: category,
     quantity: quantity,
+    externalIds: externalIds,
   });
 
   var requestOptions = {
@@ -116,6 +118,7 @@ const EditProductScreen = ({ navigation, route }) => {
     setQuantity(product.quantity.toString());
     setPrice(product.price.toString());
     setDescription(product.description);
+    setExternalIds((product.externalIds || []).join(", "));
   }, []);
 
   return (
@@ -170,6 +173,14 @@ const EditProductScreen = ({ navigation, route }) => {
             placeholderTextColor={colors.muted}
             radius={5}
             testID="edit-product-sku-input"
+          />
+          <CustomInput
+            value={externalIds}
+            setValue={setExternalIds}
+            placeholder={"External IDs, comma separated"}
+            placeholderTextColor={colors.muted}
+            radius={5}
+            testID="edit-product-external-ids-input"
           />
           <CustomInput
             value={title}

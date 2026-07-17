@@ -4,7 +4,17 @@ import SearchableDropdown from "react-native-searchable-dropdown";
 import { colors } from "../../constants";
 import scanIcon from "../../assets/icons/scan_icons.png";
 
-const SearchBar = ({ searchItems, handleProductPress }) => {
+const SearchBar = ({
+  searchItems,
+  handleProductPress,
+  handleScanPress,
+  scanEnabled = true,
+}) => {
+  const onScanPress = () => {
+    if (scanEnabled && typeof handleScanPress === "function") {
+      handleScanPress();
+    }
+  };
   return (
     <View style={styles.searchContainer} testID="search-bar">
       <View style={styles.inputContainer} testID="search-bar-input-container">
@@ -47,12 +57,24 @@ const SearchBar = ({ searchItems, handleProductPress }) => {
           underlineColorAndroid="transparent"
         />
       </View>
-      <View style={styles.buttonContainer}>
-        <TouchableOpacity style={styles.scanButton} testID="search-bar-scan-btn">
-          <Text style={styles.scanButtonText} testID="search-bar-scan-text">Scan</Text>
-          <Image source={scanIcon} style={{ width: 20, height: 20 }} testID="search-bar-scan-icon" />
-        </TouchableOpacity>
-      </View>
+      {scanEnabled ? (
+        <View style={styles.buttonContainer}>
+          <TouchableOpacity
+            style={styles.scanButton}
+            testID="search-bar-scan-btn"
+            onPress={onScanPress}
+          >
+            <Text style={styles.scanButtonText} testID="search-bar-scan-text">
+              Scan
+            </Text>
+            <Image
+              source={scanIcon}
+              style={{ width: 20, height: 20 }}
+              testID="search-bar-scan-icon"
+            />
+          </TouchableOpacity>
+        </View>
+      ) : null}
     </View>
   );
 };
