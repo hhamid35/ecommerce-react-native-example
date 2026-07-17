@@ -2,7 +2,12 @@ const express = require("express");
 const cors = require("cors");
 const multer = require("multer");
 const path = require("path");
+const crypto = require("crypto");
 const { v4: uuidv4 } = require("uuid");
+
+const PASSWORD_RESET_TOKEN_TTL_MS = 15 * 60 * 1000;
+const PASSWORD_RESET_BASE_URL =
+  process.env.PASSWORD_RESET_BASE_URL || "easybuy://reset-password";
 
 const app = express();
 const PORT = 3002;
@@ -281,6 +286,108 @@ let orders = [
     updatedAt: new Date("2024-01-12T16:00:00Z").toISOString(),
   },
 ];
+
+let passwordResetTokens = [];
+
+function normalizeEmail(email) {
+  return String(email || "")
+    .trim()
+    .toLowerCase();
+}
+
+function isValidEmail(email) {
+  const normalized = normalizeEmail(email);
+  return normalized.includes("@") && normalized.length >= 6;
+}
+
+function maskEmail(email) {
+  const normalized = normalizeEmail(email);
+  const atIndex = normalized.indexOf("@");
+  if (atIndex <= 0) {
+    return "***";
+  }
+  const local = normalized.slice(0, atIndex);
+  const domain = normalized.slice(atIndex);
+  const maskedLocal = local.length <= 1 ? "*" : `${local[0]}***`;
+  return `${maskedLocal}${domain}`;
+}
+
+function hashResetToken(token) {
+  return crypto.createHash("sha256").update(token).digest("hex");
+}
+
+function validatePasswordChange(user, newPassword, confirmPassword) {
+  if (!newPassword) {
+    return { valid: false, message: "Password is required" };
+  }
+  if (!confirmPassword) {
+    return { valid: false, message: "Password confirmation is required" };
+  }
+  if (newPassword.length < 6) {
+    return { valid: false, message: "Password must be 6 characters long" };
+  }
+  if (newPassword !== confirmPassword) {
+    return { valid: false, message: "Password not matched" };
+  }
+  if (user && user.password === newPassword) {
+    return {
+      valid: false,
+      message: "You are not allowed to set the previous used password",
+    };
+  }
+  return { valid: true };
+}
+
+function invalidateActiveTokensForUser(userId) {
+  const now = new Date().toISOString();
+  passwordResetTokens.forEach((record) => {
+    if (record.userId === userId && !record.usedAt) {
+      record.usedAt = now;
+    }
+  });
+}
+
+function createPasswordResetToken(user) {
+  invalidateActiveTokensForUser(user._id);
+  const rawToken = uuidv4();
+  const requestId = uuidv4();
+  const createdAt = new Date();
+  const expiresAt = new Date(createdAt.getTime() + PASSWORD_RESET_TOKEN_TTL_MS);
+  const record = {
+    requestId,
+    userId: user._id,
+    email: normalizeEmail(user.email),
+    tokenHash: hashResetToken(rawToken),
+    createdAt: createdAt.toISOString(),
+    expiresAt: expiresAt.toISOString(),
+    usedAt: null,
+  };
+  passwordResetTokens.push(record);
+  const resetUrl = `${PASSWORD_RESET_BASE_URL}?token=${encodeURIComponent(rawToken)}`;
+  return { rawToken, resetUrl, record };
+}
+
+function findPasswordResetRecord(rawToken) {
+  if (!rawToken) {
+    return { status: "missing" };
+  }
+  const tokenHash = hashResetToken(rawToken);
+  const record = passwordResetTokens.find((r) => r.tokenHash === tokenHash);
+  if (!record) {
+    return { status: "invalid" };
+  }
+  if (record.usedAt) {
+    return { status: "used", record };
+  }
+  if (new Date(record.expiresAt).getTime() <= Date.now()) {
+    return { status: "expired", record };
+  }
+  const user = users.find((u) => u._id === record.userId);
+  if (!user) {
+    return { status: "invalid", record };
+  }
+  return { status: "valid", record, user };
+}
 
 // ─── Auth middleware (simple token check) ─────────────────────────────────────
 const authMiddleware = (req, res, next) => {
@@ -563,6 +670,166 @@ app.post("/reset-password", (req, res) => {
   res.json({ success: true, message: "Password updated successfully" });
 });
 
+// POST /password-reset/request
+app.post("/password-reset/request", (req, res) => {
+  try {
+    const { email } = req.body;
+    if (!email || !isValidEmail(email)) {
+      return res
+        .status(400)
+        .json({ success: false, message: "A valid email is required" });
+    }
+
+    const normalizedEmail = normalizeEmail(email);
+    const user = users.find((u) => normalizeEmail(u.email) === normalizedEmail);
+    const genericMessage =
+      "If an account exists for that email, reset instructions have been sent.";
+
+    if (!user) {
+      console.log("password_reset_requested", {
+        requestId: null,
+        emailHint: maskEmail(normalizedEmail),
+        knownAccount: false,
+      });
+      return res.json({ success: true, message: genericMessage, data: null });
+    }
+
+    const { rawToken, resetUrl, record } = createPasswordResetToken(user);
+    console.log("password_reset_requested", {
+      requestId: record.requestId,
+      emailHint: maskEmail(normalizedEmail),
+      knownAccount: true,
+    });
+    console.log("password_reset_mock_delivery", {
+      requestId: record.requestId,
+      resetUrl,
+      mockOnly: true,
+    });
+
+    return res.json({
+      success: true,
+      message: genericMessage,
+      data: {
+        requestId: record.requestId,
+        expiresAt: record.expiresAt,
+        devResetToken: rawToken,
+        devResetUrl: resetUrl,
+      },
+    });
+  } catch (error) {
+    console.error("password_reset_request_error", error.message);
+    return res.status(500).json({
+      success: false,
+      message: "Unable to send reset instructions. Please try again.",
+    });
+  }
+});
+
+// GET /password-reset/verify?token=
+app.get("/password-reset/verify", (req, res) => {
+  const { token } = req.query;
+  if (!token) {
+    console.log("password_reset_verify_failed", { reason: "missing" });
+    return res
+      .status(400)
+      .json({ success: false, message: "Reset token is required" });
+  }
+
+  const lookup = findPasswordResetRecord(token);
+  if (lookup.status === "invalid") {
+    console.log("password_reset_verify_failed", { reason: "invalid" });
+    return res
+      .status(400)
+      .json({ success: false, message: "Reset link is invalid" });
+  }
+  if (lookup.status === "expired") {
+    console.log("password_reset_verify_failed", { reason: "expired" });
+    return res.status(410).json({
+      success: false,
+      message: "Reset link has expired. Please request a new one.",
+      code: "RESET_TOKEN_EXPIRED",
+    });
+  }
+  if (lookup.status === "used") {
+    console.log("password_reset_verify_failed", { reason: "used" });
+    return res.status(410).json({
+      success: false,
+      message: "Reset link has already been used. Please request a new one.",
+      code: "RESET_TOKEN_USED",
+    });
+  }
+
+  return res.json({
+    success: true,
+    message: "Reset link is valid",
+    data: {
+      valid: true,
+      emailHint: maskEmail(lookup.record.email),
+      expiresAt: lookup.record.expiresAt,
+    },
+  });
+});
+
+// POST /password-reset/complete
+app.post("/password-reset/complete", (req, res) => {
+  const { token, newPassword, confirmPassword } = req.body;
+  if (!token) {
+    return res
+      .status(400)
+      .json({ success: false, message: "Reset token is required" });
+  }
+
+  const lookup = findPasswordResetRecord(token);
+  if (lookup.status === "invalid") {
+    return res
+      .status(400)
+      .json({ success: false, message: "Reset link is invalid" });
+  }
+  if (lookup.status === "expired") {
+    return res.status(410).json({
+      success: false,
+      message: "Reset link has expired. Please request a new one.",
+      code: "RESET_TOKEN_EXPIRED",
+    });
+  }
+  if (lookup.status === "used") {
+    return res.status(410).json({
+      success: false,
+      message: "Reset link has already been used. Please request a new one.",
+      code: "RESET_TOKEN_USED",
+    });
+  }
+
+  const validation = validatePasswordChange(
+    lookup.user,
+    newPassword,
+    confirmPassword
+  );
+  if (!validation.valid) {
+    const statusCode =
+      validation.message === "You are not allowed to set the previous used password"
+        ? 409
+        : 400;
+    return res.status(statusCode).json({
+      success: false,
+      message: validation.message,
+    });
+  }
+
+  lookup.user.password = newPassword;
+  lookup.record.usedAt = new Date().toISOString();
+  console.log("password_reset_completed", {
+    requestId: lookup.record.requestId,
+    userId: lookup.user._id,
+    emailHint: maskEmail(lookup.record.email),
+  });
+
+  return res.json({
+    success: true,
+    message: "Password reset successfully. Please login with your new password.",
+  });
+});
+
 // POST /photos/upload
 app.post("/photos/upload", upload.single("photos"), (req, res) => {
   if (!req.file) {
@@ -595,7 +862,8 @@ app.get("/uploads/:filename", (req, res) => {
 });
 
 // ─── Start server ─────────────────────────────────────────────────────────────
-app.listen(PORT, "0.0.0.0", () => {
+if (require.main === module) {
+  app.listen(PORT, "0.0.0.0", () => {
   console.log(`\n🚀 EasyBuy Mock Server running at http://localhost:${PORT}`);
   console.log(`\n📋 Available endpoints:`);
   console.log(`   POST   /register`);
@@ -616,6 +884,9 @@ app.listen(PORT, "0.0.0.0", () => {
   console.log(`   POST   /checkout             (user)`);
   console.log(`   GET    /delete-user?id=`);
   console.log(`   POST   /reset-password?id=`);
+  console.log(`   POST   /password-reset/request`);
+  console.log(`   GET    /password-reset/verify?token=`);
+  console.log(`   POST   /password-reset/complete`);
   console.log(`   POST   /photos/upload`);
   console.log(`   GET    /uploads/:filename`);
   console.log(`\n🔑 Test tokens:`);
@@ -624,6 +895,21 @@ app.listen(PORT, "0.0.0.0", () => {
   console.log(`\n👤 Test credentials:`);
   console.log(`   Admin  → email: admin@easybuy.com  | password: admin123`);
   console.log(`   User   → email: user@easybuy.com   | password: user123\n`);
-});
+  });
+}
+
+module.exports = {
+  app,
+  users,
+  passwordResetTokens,
+  normalizeEmail,
+  isValidEmail,
+  maskEmail,
+  hashResetToken,
+  validatePasswordChange,
+  createPasswordResetToken,
+  findPasswordResetRecord,
+  PASSWORD_RESET_TOKEN_TTL_MS,
+};
 
 // Made with Bob

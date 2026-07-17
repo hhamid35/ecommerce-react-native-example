@@ -18,44 +18,23 @@ import ProgressDialog from "react-native-progress-dialog";
 import ConnectionAlert from "../../components/ConnectionAlert/ConnectionAlert";
 import * as authStorage from "../../utils/authStorage";
 
-// Hardcoded credentials
-const HARDCODED_USERS = [
-  {
-    _id: "admin001",
-    name: "Admin User",
-    email: "admin@easybuy.com",
-    password: "admin123",
-    userType: "ADMIN",
-  },
-  {
-    _id: "user001",
-    name: "Regular User",
-    email: "user@easybuy.com",
-    password: "user123",
-    userType: "USER",
-  },
-];
-
 const LoginScreen = ({ navigation }) => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [isloading, setIsloading] = useState(false);
 
-  //method to store the authUser to secure storage
   const _storeData = async (user) => {
     try {
       await authStorage.setItem("authUser", JSON.stringify(user));
-    } catch (error) {
-      console.log(error);
-      setError(error);
+    } catch (storageError) {
+      console.log(storageError);
+      setError(storageError.message || "Unable to save session");
     }
   };
 
-  //method to validate the user credentials and navigate to Home Screen / Dashboard
   const loginHandle = () => {
     setIsloading(true);
-    //[check validation] -- Start
     if (email == "") {
       setIsloading(false);
       return setError("Please enter your email");
@@ -76,40 +55,44 @@ const LoginScreen = ({ navigation }) => {
       setIsloading(false);
       return setError("Password must be 6 characters long");
     }
-    //[check validation] -- End
 
-    // Hardcoded credential check (bypasses API)
-    const matchedUser = HARDCODED_USERS.find(
-      (u) => u.email === email && u.password === password
-    );
-
-    if (matchedUser) {
-      _storeData(matchedUser);
-      setIsloading(false);
-      if (matchedUser.userType === "ADMIN") {
-        navigation.replace("dashboard", { authUser: matchedUser });
-      } else {
-        navigation.replace("tab", { user: matchedUser });
-      }
-    } else {
-      setIsloading(false);
-      setError("Invalid email or password");
-    }
+    fetch(network.serverip + "/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password }),
+    })
+      .then((response) => response.json())
+      .then((result) => {
+        setIsloading(false);
+        if (result.success === true && result.data) {
+          _storeData(result.data);
+          if (result.data.userType === "ADMIN") {
+            navigation.replace("dashboard", { authUser: result.data });
+          } else {
+            navigation.replace("tab", { user: result.data });
+          }
+        } else {
+          setError(result.message || "Invalid email or password");
+        }
+      })
+      .catch((fetchError) => {
+        setIsloading(false);
+        setError(fetchError.message || "Invalid email or password");
+        console.log("error", fetchError.message);
+      });
   };
 
   return (
-    <ConnectionAlert onChange={(connectionState) => {}}>
-      <KeyboardAvoidingView
-        // behavior={Platform.OS === "ios" ? "padding" : "height"}
-        style={styles.container}
-        testID="login-screen"
-      >
+    <ConnectionAlert onChange={() => {}}>
+      <KeyboardAvoidingView style={styles.container} testID="login-screen">
         <ScrollView style={{ flex: 1, width: "100%" }} testID="login-scroll">
           <ProgressDialog visible={isloading} label={"Login ..."} />
           <StatusBar testID="login-status-bar"></StatusBar>
           <View style={styles.welconeContainer}>
             <View>
-              <Text style={styles.welcomeText} testID="login-welcome-text">Welcome to EasyBuy</Text>
+              <Text style={styles.welcomeText} testID="login-welcome-text">
+                Welcome to EasyBuy
+              </Text>
               <Text style={styles.welcomeParagraph} testID="login-subtitle">
                 make your ecommerce easy
               </Text>
@@ -119,7 +102,9 @@ const LoginScreen = ({ navigation }) => {
             </View>
           </View>
           <View style={styles.screenNameContainer}>
-            <Text style={styles.screenNameText} testID="login-heading">Login</Text>
+            <Text style={styles.screenNameText} testID="login-heading">
+              Login
+            </Text>
           </View>
           <View style={styles.formContainer}>
             <CustomAlert message={error} type={"error"} testID="login-alert" />
@@ -188,7 +173,6 @@ const styles = StyleSheet.create({
     justifyContent: "space-around",
     alignItems: "center",
     height: "30%",
-    // padding:15
   },
   formContainer: {
     flex: 3,
