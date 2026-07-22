@@ -8,6 +8,15 @@ const mockNavigate = jest.fn();
 const mockGoBack = jest.fn();
 const mockRequestPermission = jest.fn();
 
+jest.mock("@expo/vector-icons", () => {
+  const React = require("react");
+  const { Text } = require("react-native");
+
+  return {
+    Ionicons: (props) => <Text testID={props.testID}>{props.name}</Text>,
+  };
+});
+
 jest.mock("expo-camera", () => {
   const React = require("react");
   const { View, Text, TouchableOpacity } = require("react-native");
