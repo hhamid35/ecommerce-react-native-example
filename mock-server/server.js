@@ -79,6 +79,7 @@ let products = [
     _id: "prod001",
     title: "Classic White T-Shirt",
     sku: "GAR-001",
+    externalId: "012345678905",
     price: 19.99,
     quantity: 50,
     description: "A comfortable everyday white t-shirt made from 100% cotton.",
@@ -305,6 +306,32 @@ const adminMiddleware = (req, res, next) => {
   });
 };
 
+// ─── Scan resolution helpers ─────────────────────────────────────────────────
+
+function normalizeScanCode(value) {
+  return String(value || "").trim().replace(/\s+/g, "").toUpperCase();
+}
+
+function findProductByScanCode(code) {
+  const normalized = normalizeScanCode(code);
+  if (!normalized) {
+    return null;
+  }
+
+  const exact = String(code).trim();
+  return (
+    products.find((product) => {
+      const skuMatch =
+        normalizeScanCode(product.sku) === normalized || product.sku === exact;
+      const externalMatch =
+        product.externalId &&
+        (normalizeScanCode(product.externalId) === normalized ||
+          product.externalId === exact);
+      return skuMatch || externalMatch;
+    }) || null
+  );
+}
+
 // ─── Routes ───────────────────────────────────────────────────────────────────
 
 // POST /register
@@ -343,6 +370,39 @@ app.post("/login", (req, res) => {
 // GET /products
 app.get("/products", (req, res) => {
   res.json({ success: true, data: products });
+});
+
+// GET /products/resolve-scan?code=&format=
+app.get("/products/resolve-scan", (req, res) => {
+  const { code } = req.query;
+
+  if (!code || !String(code).trim()) {
+    return res.status(400).json({
+      success: false,
+      status: 400,
+      code: "SCAN_CODE_REQUIRED",
+      message: "Scan code is required",
+      data: null,
+    });
+  }
+
+  const product = findProductByScanCode(code);
+  if (!product) {
+    return res.status(404).json({
+      success: false,
+      status: 404,
+      code: "PRODUCT_SCAN_NOT_FOUND",
+      message: "No product found for scanned code",
+      data: null,
+    });
+  }
+
+  return res.json({
+    success: true,
+    status: 200,
+    message: "product found",
+    data: product,
+  });
 });
 
 // POST /product  (admin: add product)
@@ -601,6 +661,7 @@ app.listen(PORT, "0.0.0.0", () => {
   console.log(`   POST   /register`);
   console.log(`   POST   /login`);
   console.log(`   GET    /products`);
+  console.log(`   GET    /products/resolve-scan?code=`);
   console.log(`   POST   /product              (admin)`);
   console.log(`   POST   /update-product?id=   (admin)`);
   console.log(`   GET    /delete-product?id=   (admin)`);

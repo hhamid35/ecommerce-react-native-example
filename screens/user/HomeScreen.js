@@ -16,6 +16,7 @@ import SearchBar from "../../components/HomeScreen/SearchBar";
 import PromotionSlider from "../../components/HomeScreen/PromotionSlider";
 import CategoryList from "../../components/HomeScreen/CategoryList";
 import NewArrivals from "../../components/HomeScreen/NewArrivals";
+import { isProductScanEnabled } from "../../utils/featureFlags";
 
 const HomeScreen = ({ navigation, route }) => {
   const cartproduct = useSelector((state) => state.product);
@@ -42,6 +43,10 @@ const HomeScreen = ({ navigation, route }) => {
   //method to navigate to product detail screen of a specific product
   const handleProductPress = (product) => {
     navigation.navigate("productdetail", { product: product });
+  };
+
+  const handleScanPress = () => {
+    navigation.navigate("scanproduct");
   };
 
   //method to add to cart (redux)
@@ -93,6 +98,7 @@ const HomeScreen = ({ navigation, route }) => {
         <SearchBar
           searchItems={searchItems}
           handleProductPress={handleProductPress}
+          onScanPress={isProductScanEnabled() ? handleScanPress : undefined}
         />
         <ScrollView nestedScrollEnabled={true} testID="home-scroll">
           <PromotionSlider slides={slides} />
