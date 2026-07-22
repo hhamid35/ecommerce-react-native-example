@@ -12,7 +12,7 @@ import { colors, network } from "../../constants";
 import { Ionicons } from "@expo/vector-icons";
 import CustomAlert from "../../components/CustomAlert/CustomAlert";
 import ProgressDialog from "react-native-progress-dialog";
-import * as authStorage from "../../utils/authStorage";
+import * as api from "../../api";
 import WishList from "../../components/WishList/WishList";
 
 const MyWishlistScreen = ({ navigation, route }) => {
@@ -30,12 +30,6 @@ const MyWishlistScreen = ({ navigation, route }) => {
     navigation.navigate("productdetail", { product: product });
   };
 
-  //method the remove the authUser from Aysnc Storage and navigate back to login screen
-  const logout = async () => {
-    await authStorage.deleteItem("authUser");
-    navigation.replace("login");
-  };
-
   //method call on pull refresh
   const handleOnRefresh = () => {
     setRefreshing(true);
@@ -45,22 +39,10 @@ const MyWishlistScreen = ({ navigation, route }) => {
 
   //method to fetch the wishlist from server using API call
   const fetchWishlist = () => {
-    var myHeaders = new Headers();
-    myHeaders.append("x-auth-token", user.token);
-
-    var requestOptions = {
-      method: "GET",
-      headers: myHeaders,
-      redirect: "follow",
-    };
     setIsloading(true);
-    fetch(`${network.serverip}/wishlist`, requestOptions) // API call
-      .then((response) => response.json())
+    api
+      .getWishlist() // API call
       .then((result) => {
-        //check if the token is expired
-        if (result?.err === "jwt expired") {
-          logout();
-        }
         if (result.success) {
           setWishlist(result.data[0].wishlist);
           setError("");
@@ -76,17 +58,8 @@ const MyWishlistScreen = ({ navigation, route }) => {
 
   //method to remove the item from wishlist using API call
   const handleRemoveFromWishlist = (id) => {
-    var myHeaders = new Headers();
-    myHeaders.append("x-auth-token", user.token);
-
-    var requestOptions = {
-      method: "GET",
-      headers: myHeaders,
-      redirect: "follow",
-    };
-
-    fetch(`${network.serverip}/remove-from-wishlist?id=${id}`, requestOptions)
-      .then((response) => response.json())
+    api
+      .removeFromWishlist(id)
       .then((result) => {
         if (result.success) {
           setError(result.message);
@@ -98,7 +71,6 @@ const MyWishlistScreen = ({ navigation, route }) => {
         setOnWishlist(!onWishlist);
       })
       .catch((error) => {
-        setError(result.message);
         setAlertType("error");
         console.log("error", error);
       });

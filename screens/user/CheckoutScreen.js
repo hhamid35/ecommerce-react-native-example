@@ -10,12 +10,12 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import React, { useState, useEffect } from "react";
 import BasicProductList from "../../components/BasicProductList/BasicProductList";
-import { colors, network } from "../../constants";
+import { colors } from "../../constants";
 import CustomButton from "../../components/CustomButton";
 import { useSelector, useDispatch } from "react-redux";
 import * as actionCreaters from "../../states/actionCreaters/actionCreaters";
 import { bindActionCreators } from "redux";
-import * as authStorage from "../../utils/authStorage";
+import * as api from "../../api";
 import CustomInput from "../../components/CustomInput";
 import ProgressDialog from "react-native-progress-dialog";
 
@@ -34,22 +34,9 @@ const CheckoutScreen = ({ navigation, route }) => {
   const [streetAddress, setStreetAddress] = useState("");
   const [zipcode, setZipcode] = useState("");
 
-  //method to remove the authUser from aysnc storage and navigate to login
-  const logout = async () => {
-    await authStorage.deleteItem("authUser");
-    navigation.replace("login");
-  };
-
   //method to handle checkout
   const handleCheckout = async () => {
     setIsloading(true);
-    var myHeaders = new Headers();
-    const value = await authStorage.getItem("authUser");
-    let user = JSON.parse(value);
-    console.log("Checkout:", user.token);
-
-    myHeaders.append("x-auth-token", user.token);
-    myHeaders.append("Content-Type", "application/json");
 
     var payload = [];
     var totalamount = 0;
@@ -65,37 +52,26 @@ const CheckoutScreen = ({ navigation, route }) => {
       payload.push(obj);
     });
 
-    var raw = JSON.stringify({
-      items: payload,
-      amount: totalamount,
-      discount: 0,
-      payment_type: "cod",
-      country: country,
-      status: "pending",
-      city: city,
-      zipcode: zipcode,
-      shippingAddress: streetAddress,
-    });
-
-    var requestOptions = {
-      method: "POST",
-      headers: myHeaders,
-      body: raw,
-      redirect: "follow",
-    };
-
-    fetch(network.serverip + "/checkout", requestOptions) //API call
-      .then((response) => response.json())
+    api
+      .checkout({
+        items: payload,
+        amount: totalamount,
+        discount: 0,
+        payment_type: "cod",
+        country: country,
+        status: "pending",
+        city: city,
+        zipcode: zipcode,
+        shippingAddress: streetAddress,
+      }) //API call
       .then((result) => {
         console.log("Checkout=>", result);
-        if (result.err === "jwt expired") {
-          setIsloading(false);
-          logout();
-        }
         if (result.success == true) {
           setIsloading(false);
           emptyCart("empty");
           navigation.replace("orderconfirm");
+        } else {
+          setIsloading(false);
         }
       })
       .catch((error) => {

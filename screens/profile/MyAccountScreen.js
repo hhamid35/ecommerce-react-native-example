@@ -11,7 +11,8 @@ import UserProfileCard from "../../components/UserProfileCard/UserProfileCard";
 import { Ionicons } from "@expo/vector-icons";
 import { MaterialIcons } from "@expo/vector-icons";
 import OptionList from "../../components/OptionList/OptionList";
-import { colors, network } from "../../constants";
+import { colors } from "../../constants";
+import * as api from "../../api";
 
 const MyAccountScreen = ({ navigation, route }) => {
   const [showBox, setShowBox] = useState(true);
@@ -39,17 +40,10 @@ const MyAccountScreen = ({ navigation, route }) => {
     );
   };
 
-  var requestOptions = {
-    method: "GET",
-    redirect: "follow",
-  };
-
   //method to delete the account using API call
   const DeleteAccontHandle = (userID) => {
-    let fetchURL = network.serverip + "/delete-user?id=" + String(userID);
-    console.log(fetchURL);
-    fetch(fetchURL, requestOptions)
-      .then((response) => response.json())
+    api
+      .deleteUser(userID)
       .then((result) => {
         if (result.success == true) {
           console.log(result.data);

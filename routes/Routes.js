@@ -1,4 +1,5 @@
 import { NavigationContainer } from "@react-navigation/native";
+import { navigationRef } from "./navigationRef";
 import LoginScreen from "../screens/auth/LoginScreen";
 import SignupScreen from "../screens/auth/SignupScreen";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
@@ -30,7 +31,7 @@ const Stack = createNativeStackNavigator();
 
 const Routes = () => {
   return (
-    <NavigationContainer testID="navigation-container">
+    <NavigationContainer ref={navigationRef} testID="navigation-container">
       <Stack.Navigator
         initialRouteName="splash"
         screenOptions={{ headerShown: false }}

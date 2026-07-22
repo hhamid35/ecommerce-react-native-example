@@ -8,12 +8,12 @@ import {
   RefreshControl,
 } from "react-native";
 import React, { useState, useEffect } from "react";
-import { colors, network } from "../../constants";
+import { colors } from "../../constants";
 import { Ionicons } from "@expo/vector-icons";
 import CustomAlert from "../../components/CustomAlert/CustomAlert";
 import ProgressDialog from "react-native-progress-dialog";
 import OrderList from "../../components/OrderList/OrderList";
-import * as authStorage from "../../utils/authStorage";
+import * as api from "../../api";
 
 const MyOrderScreen = ({ navigation, route }) => {
   const { user } = route.params;
@@ -25,12 +25,6 @@ const MyOrderScreen = ({ navigation, route }) => {
   const [orders, setOrders] = useState([]);
   const [UserInfo, setUserInfo] = useState({});
 
-  //method to remove the authUser from aysnc storage and navigate to login
-  const logout = async () => {
-    await authStorage.deleteItem("authUser");
-    navigation.replace("login");
-  };
-
   //method to convert the authUser to json object
   const convertToJSON = (obj) => {
     try {
@@ -38,17 +32,6 @@ const MyOrderScreen = ({ navigation, route }) => {
     } catch (e) {
       setUserInfo(obj);
     }
-  };
-
-  //method to convert the authUser to json object and return token
-  const getToken = (obj) => {
-    try {
-      setUserInfo(JSON.parse(obj));
-    } catch (e) {
-      setUserInfo(obj);
-      return user.token;
-    }
-    return UserInfo.token;
   };
 
   //method call on pull refresh
@@ -68,22 +51,10 @@ const MyOrderScreen = ({ navigation, route }) => {
 
   //fetch order from server using API call
   const fetchOrders = () => {
-    var myHeaders = new Headers();
-    let token = getToken(user);
-    myHeaders.append("x-auth-token", token);
-
-    var requestOptions = {
-      method: "GET",
-      headers: myHeaders,
-      redirect: "follow",
-    };
     setIsloading(true);
-    fetch(`${network.serverip}/orders`, requestOptions)
-      .then((response) => response.json())
+    api
+      .getOrders()
       .then((result) => {
-        if (result?.err === "jwt expired") {
-          logout();
-        }
         if (result.success) {
           setOrders(result.data);
           setError("");

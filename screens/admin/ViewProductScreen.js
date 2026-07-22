@@ -10,6 +10,7 @@ import {
 } from "react-native";
 import React, { useState, useEffect } from "react";
 import { colors, network } from "../../constants";
+import * as api from "../../api";
 import { Ionicons } from "@expo/vector-icons";
 import { AntDesign } from "@expo/vector-icons";
 import ProductList from "../../components/ProductList/ProductList";
@@ -29,20 +30,6 @@ const ViewProductScreen = ({ navigation, route }) => {
   const [foundItems, setFoundItems] = useState([]);
   const [filterItem, setFilterItem] = useState("");
 
-  var myHeaders = new Headers();
-  myHeaders.append("x-auth-token", authUser.token);
-
-  var requestOptions = {
-    method: "GET",
-    headers: myHeaders,
-    redirect: "follow",
-  };
-
-  var ProductListRequestOptions = {
-    method: "GET",
-    redirect: "follow",
-  };
-
   //method call on pull refresh
   const handleOnRefresh = () => {
     setRefreshing(true);
@@ -53,9 +40,8 @@ const ViewProductScreen = ({ navigation, route }) => {
   //method to delete the specific order
   const handleDelete = (id) => {
     setIsloading(true);
-    console.log(`${network.serverip}/delete-product?id=${id}`);
-    fetch(`${network.serverip}/delete-product?id=${id}`, requestOptions)
-      .then((response) => response.json())
+    api
+      .deleteProduct(id)
       .then((result) => {
         if (result.success) {
           fetchProduct();
@@ -96,8 +82,8 @@ const ViewProductScreen = ({ navigation, route }) => {
   //method the fetch the product data from server using API call
   const fetchProduct = () => {
     setIsloading(true);
-    fetch(`${network.serverip}/products`, ProductListRequestOptions)
-      .then((response) => response.json())
+    api
+      .getProducts()
       .then((result) => {
         if (result.success) {
           setProducts(result.data);

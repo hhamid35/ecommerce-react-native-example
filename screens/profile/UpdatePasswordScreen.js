@@ -1,10 +1,11 @@
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import React, { useState } from "react";
 import { Ionicons } from "@expo/vector-icons";
-import { colors, network } from "../../constants";
+import { colors } from "../../constants";
 import CustomInput from "../../components/CustomInput";
 import CustomButton from "../../components/CustomButton";
 import CustomAlert from "../../components/CustomAlert/CustomAlert";
+import * as api from "../../api";
 
 const UpdatePasswordScreen = ({ navigation, route }) => {
   const { userID } = route.params;
@@ -14,21 +15,6 @@ const UpdatePasswordScreen = ({ navigation, route }) => {
   const [confirmPassword, setCconfirmPassword] = useState("");
   const [alertType, setAlertType] = useState("error");
 
-  var myHeaders = new Headers();
-  myHeaders.append("Content-Type", "application/json");
-
-  var raw = JSON.stringify({
-    password: currnetPassword,
-    newPassword: newPassword,
-  });
-
-  var requestOptions = {
-    method: "POST",
-    headers: myHeaders,
-    body: raw,
-    redirect: "follow",
-  };
-
   // method to update the password by the check the current password
   const updatePasswordHandle = () => {
     if (currnetPassword == newPassword) {
@@ -37,11 +23,11 @@ const UpdatePasswordScreen = ({ navigation, route }) => {
       setError("Password not matched");
     } else {
       setError("");
-      fetch(
-        network.serverip + "/reset-password?id=" + String(userID),
-        requestOptions
-      ) // API call
-        .then((response) => response.json())
+      api
+        .resetPassword(userID, {
+          password: currnetPassword,
+          newPassword: newPassword,
+        }) // API call
         .then((result) => {
           setAlertType("success");
           setError("Password is updated successfully ");

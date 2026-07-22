@@ -2,7 +2,7 @@ import { StyleSheet, Image, View } from "react-native";
 import React, { useEffect } from "react";
 import { colors } from "../../constants";
 import logo from "../../assets/logo/logo_white.png";
-import * as authStorage from "../../utils/authStorage";
+import * as session from "../../utils/session";
 
 const Splash = ({ navigation }) => {
   const goToLogin = () => {
@@ -14,16 +14,15 @@ const Splash = ({ navigation }) => {
   //method to fetch the authUser data from secure storage if there is any and login the Dashboard or Home Screen according to the user type
   const _retrieveData = async () => {
     try {
-      const value = await authStorage.getItem("authUser");
-      if (value !== null) {
-        let user = JSON.parse(value); // covert the authUser value to json
+      const user = await session.getUser();
+      if (user) {
         if (user.userType === "ADMIN") {
           setTimeout(() => {
-            navigation.replace("dashboard", { authUser: JSON.parse(value) }); // navigate to Admin dashboard
+            navigation.replace("dashboard", { authUser: user }); // navigate to Admin dashboard
           }, 2000);
         } else {
           setTimeout(() => {
-            navigation.replace("tab", { user: JSON.parse(value) }); // navigate to User Home screen
+            navigation.replace("tab", { user: user }); // navigate to User Home screen
           }, 2000);
         }
       } else {

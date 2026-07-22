@@ -7,7 +7,8 @@ import {
   TouchableOpacity,
 } from "react-native";
 import React, { useState, useEffect } from "react";
-import { colors, network } from "../../constants";
+import { colors } from "../../constants";
+import * as api from "../../api";
 import { Ionicons } from "@expo/vector-icons";
 import CustomAlert from "../../components/CustomAlert/CustomAlert";
 import ProgressDialog from "react-native-progress-dialog";
@@ -16,7 +17,7 @@ import CustomButton from "../../components/CustomButton";
 import DropDownPicker from "react-native-dropdown-picker";
 
 const ViewOrderDetailScreen = ({ navigation, route }) => {
-  const { orderDetail, Token } = route.params;
+  const { orderDetail } = route.params;
   const [isloading, setIsloading] = useState(false);
   const [label, setLabel] = useState("Loading..");
   const [error, setError] = useState("");
@@ -65,23 +66,9 @@ const ViewOrderDetailScreen = ({ navigation, route }) => {
     setIsloading(true);
     setError("");
     setAlertType("error");
-    var myHeaders = new Headers();
-    myHeaders.append("x-auth-token", Token);
 
-    var requestOptions = {
-      method: "GET",
-      headers: myHeaders,
-      redirect: "follow",
-    };
-    console.log(
-      `Link:${network.serverip}/admin/order-status?orderId=${id}&status=${value}`
-    );
-
-    fetch(
-      `${network.serverip}/admin/order-status?orderId=${id}&status=${value}`,
-      requestOptions
-    ) //API call
-      .then((response) => response.json())
+    api
+      .updateOrderStatus(id, value) //API call
       .then((result) => {
         if (result.success == true) {
           setError(`Order status is successfully updated to ${value}`);

@@ -14,7 +14,7 @@ import CustomButton from "../../components/CustomButton";
 import { useSelector, useDispatch } from "react-redux";
 import { bindActionCreators } from "redux";
 import * as actionCreaters from "../../states/actionCreaters/actionCreaters";
-import * as authStorage from "../../utils/authStorage";
+import * as api from "../../api";
 import CustomAlert from "../../components/CustomAlert/CustomAlert";
 
 const ProductDetailScreen = ({ navigation, route }) => {
@@ -29,12 +29,6 @@ const ProductDetailScreen = ({ navigation, route }) => {
     addCartItem(item);
   };
 
-  //remove the authUser from async storage and navigate to login
-  const logout = async () => {
-    await authStorage.deleteItem("authUser");
-    navigation.replace("login");
-  };
-
   const [onWishlist, setOnWishlist] = useState(false);
   const [avaiableQuantity, setAvaiableQuantity] = useState(0);
   const [quantity, setQuantity] = useState(0);
@@ -46,22 +40,9 @@ const ProductDetailScreen = ({ navigation, route }) => {
 
   //method to fetch wishlist from server using API call
   const fetchWishlist = async () => {
-    const value = await authStorage.getItem("authUser"); // get authUser from async storage
-    let user = JSON.parse(value);
-    var myHeaders = new Headers();
-    myHeaders.append("x-auth-token", user.token);
-
-    var requestOptions = {
-      method: "GET",
-      headers: myHeaders,
-      redirect: "follow",
-    };
-    fetch(`${network.serverip}/wishlist`, requestOptions)
-      .then((response) => response.json())
+    api
+      .getWishlist()
       .then((result) => {
-        if (result?.err === "jwt expired") {
-          logout();
-        }
         if (result.success) {
           setWishlistItems(result.data[0].wishlist);
           setIsDisbale(false);
@@ -99,25 +80,11 @@ const ProductDetailScreen = ({ navigation, route }) => {
   //method to add or remove item from wishlist
   const handleWishlistBtn = async () => {
     setIsDisbale(true);
-    const value = await authStorage.getItem("authUser");
-    let user = JSON.parse(value);
 
     if (onWishlist) {
-      var myHeaders = new Headers();
-      myHeaders.append("x-auth-token", user.token);
-
-      var requestOptions = {
-        method: "GET",
-        headers: myHeaders,
-        redirect: "follow",
-      };
-
       //API call to remove a item in wishlish
-      fetch(
-        `${network.serverip}/remove-from-wishlist?id=${product?._id}`,
-        requestOptions
-      )
-        .then((response) => response.json())
+      api
+        .removeFromWishlist(product?._id)
         .then((result) => {
           if (result.success) {
             setError(result.message);
@@ -130,33 +97,14 @@ const ProductDetailScreen = ({ navigation, route }) => {
           setOnWishlist(!onWishlist);
         })
         .catch((error) => {
-          setError(result.message);
           setAlertType("error");
           console.log("error", error);
         });
       setIsDisbale(false);
     } else {
-      var myHeaders2 = new Headers();
-      myHeaders2.append("x-auth-token", user.token);
-      myHeaders2.append("Content-Type", "application/json");
-
-      var raw2 = JSON.stringify({
-        productId: product?._id,
-        quantity: 1,
-      });
-
-      var addrequestOptions = {
-        method: "POST",
-        headers: myHeaders2,
-        body: raw2,
-        redirect: "follow",
-      };
-
-      console.log(addrequestOptions);
-
       //API call to add a item in wishlish
-      fetch(`${network.serverip}/add-to-wishlist`, addrequestOptions)
-        .then((response) => response.json())
+      api
+        .addToWishlist(product?._id, 1)
         .then((result) => {
           console.log(result);
           if (result.success) {
@@ -170,7 +118,6 @@ const ProductDetailScreen = ({ navigation, route }) => {
           setOnWishlist(!onWishlist);
         })
         .catch((error) => {
-          setError(result.message);
           setAlertType("error");
           console.log("error", error);
         });

@@ -10,6 +10,7 @@ import {
 } from "react-native";
 import React, { useEffect, useState } from "react";
 import { colors, network } from "../../constants";
+import * as api from "../../api";
 import CustomInput from "../../components/CustomInput";
 import CustomButton from "../../components/CustomButton";
 import { Ionicons } from "@expo/vector-icons";
@@ -31,27 +32,6 @@ const EditProductScreen = ({ navigation, route }) => {
   const [description, setDescription] = useState("");
   const [category, setCategory] = useState("garments");
   const [alertType, setAlertType] = useState("error");
-
-  var myHeaders = new Headers();
-  myHeaders.append("x-auth-token", authUser.token);
-  myHeaders.append("Content-Type", "application/json");
-
-  var raw = JSON.stringify({
-    title: title,
-    sku: sku,
-    price: price,
-    image: image,
-    description: description,
-    category: category,
-    quantity: quantity,
-  });
-
-  var requestOptions = {
-    method: "POST",
-    headers: myHeaders,
-    body: raw,
-    redirect: "follow",
-  };
 
   //Method for selecting the image from device gallery
   const pickImage = async () => {
@@ -84,12 +64,16 @@ const EditProductScreen = ({ navigation, route }) => {
       setError("Please upload the product image");
       setIsloading(false);
     } else {
-      console.log(`${network.serverip}"/update-product?id=${product._id}"`);
-      fetch(
-        `${network.serverip}/update-product?id=${product._id}`,
-        requestOptions
-      )
-        .then((response) => response.json())
+      api
+        .updateProduct(product._id, {
+          title: title,
+          sku: sku,
+          price: price,
+          image: image,
+          description: description,
+          category: category,
+          quantity: quantity,
+        })
         .then((result) => {
           if (result.success == true) {
             setIsloading(false);

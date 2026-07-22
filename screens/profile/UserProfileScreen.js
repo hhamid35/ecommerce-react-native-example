@@ -10,7 +10,7 @@ import UserProfileCard from "../../components/UserProfileCard/UserProfileCard";
 import { Ionicons } from "@expo/vector-icons";
 import OptionList from "../../components/OptionList/OptionList";
 import { colors } from "../../constants";
-import * as authStorage from "../../utils/authStorage";
+import * as session from "../../utils/session";
 
 const UserProfileScreen = ({ navigation, route }) => {
   const [userInfo, setUserInfo] = useState({});
@@ -82,7 +82,7 @@ const UserProfileScreen = ({ navigation, route }) => {
           iconName={"log-out"}
           testID="user-profile-logout-option"
           onPress={async () => {
-            await authStorage.deleteItem("authUser");
+            await session.clearSession();
             navigation.replace("login");
           }}
         />

@@ -3,15 +3,15 @@ import React, { useEffect, useState } from "react";
 import { colors } from "../../constants";
 import SuccessImage from "../../assets/image/success.png";
 import CustomButton from "../../components/CustomButton";
-import * as authStorage from "../../utils/authStorage";
+import * as session from "../../utils/session";
 
 const OrderConfirmScreen = ({ navigation }) => {
   const [user, setUser] = useState({});
 
-  //method to get authUser from async storage
+  //method to get authUser from session
   const getUserData = async () => {
-    const value = await authStorage.getItem("authUser");
-    setUser(JSON.parse(value));
+    const value = await session.getUser();
+    setUser(value);
   };
 
   //fetch user data on initial render

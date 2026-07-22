@@ -8,7 +8,8 @@ import {
   RefreshControl,
 } from "react-native";
 import React, { useState, useEffect } from "react";
-import { colors, network } from "../../constants";
+import { colors } from "../../constants";
+import * as api from "../../api";
 import { Ionicons } from "@expo/vector-icons";
 import CustomAlert from "../../components/CustomAlert/CustomAlert";
 import CustomInput from "../../components/CustomInput";
@@ -16,8 +17,6 @@ import ProgressDialog from "react-native-progress-dialog";
 import OrderList from "../../components/OrderList/OrderList";
 
 const ViewOrdersScreen = ({ navigation, route }) => {
-  const { authUser } = route.params;
-  const [user, setUser] = useState({});
   const [isloading, setIsloading] = useState(false);
   const [refeshing, setRefreshing] = useState(false);
   const [alertType, setAlertType] = useState("error");
@@ -26,17 +25,6 @@ const ViewOrdersScreen = ({ navigation, route }) => {
   const [orders, setOrders] = useState([]);
   const [foundItems, setFoundItems] = useState([]);
   const [filterItem, setFilterItem] = useState("");
-
-  //method to convert the authUser to json object
-  const getToken = (obj) => {
-    try {
-      setUser(JSON.parse(obj));
-    } catch (e) {
-      setUser(obj);
-      return obj.token;
-    }
-    return JSON.parse(obj).token;
-  };
 
   //method call on pull refresh
   const handleOnRefresh = () => {
@@ -49,23 +37,14 @@ const ViewOrdersScreen = ({ navigation, route }) => {
   const handleOrderDetail = (item) => {
     navigation.navigate("vieworderdetails", {
       orderDetail: item,
-      Token: getToken(authUser),
     });
   };
 
   //method the fetch the order data from server using API call
   const fetchOrders = () => {
-    var myHeaders = new Headers();
-    myHeaders.append("x-auth-token", getToken(authUser));
-
-    var requestOptions = {
-      method: "GET",
-      headers: myHeaders,
-      redirect: "follow",
-    };
     setIsloading(true);
-    fetch(`${network.serverip}/admin/orders`, requestOptions)
-      .then((response) => response.json())
+    api
+      .getAdminOrders()
       .then((result) => {
         if (result.success) {
           setOrders(result.data);

@@ -15,6 +15,7 @@ import { Ionicons } from "@expo/vector-icons";
 import cartIcon from "../../assets/icons/cart_beg.png";
 import emptyBox from "../../assets/image/emptybox.png";
 import { colors, network } from "../../constants";
+import * as api from "../../api";
 import { useSelector, useDispatch } from "react-redux";
 import { bindActionCreators } from "redux";
 import * as actionCreaters from "../../states/actionCreaters/actionCreaters";
@@ -62,10 +63,6 @@ const CategoriesScreen = ({ navigation, route }) => {
     setRefreshing(false);
   };
 
-  var headerOptions = {
-    method: "GET",
-    redirect: "follow",
-  };
   const category = [
     {
       _id: "62fe244f58f7aa8230817f89",
@@ -92,12 +89,8 @@ const CategoriesScreen = ({ navigation, route }) => {
 
   //method to fetch the product from server using API call
   const fetchProduct = () => {
-    var headerOptions = {
-      method: "GET",
-      redirect: "follow",
-    };
-    fetch(`${network.serverip}/products`, headerOptions)
-      .then((response) => response.json())
+    api
+      .getProducts()
       .then((result) => {
         if (result.success) {
           setProducts(result.data);

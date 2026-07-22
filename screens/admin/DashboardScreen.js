@@ -11,11 +11,12 @@ import {
 import React, { useState, useEffect } from "react";
 import { Ionicons } from "@expo/vector-icons";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import { colors, network } from "../../constants";
+import { colors } from "../../constants";
 import CustomCard from "../../components/CustomCard/CustomCard";
 import OptionList from "../../components/OptionList/OptionList";
 import ConnectionAlert from "../../components/ConnectionAlert/ConnectionAlert";
-import * as authStorage from "../../utils/authStorage";
+import * as api from "../../api";
+import * as session from "../../utils/session";
 import ProgressDialog from "react-native-progress-dialog";
 
 const DashboardScreen = ({ navigation, route }) => {
@@ -27,25 +28,16 @@ const DashboardScreen = ({ navigation, route }) => {
   const [data, setData] = useState([]);
   const [refeshing, setRefreshing] = useState(false);
 
-  //method to remove the auth user from secure storage and navigate the login if token expires
+  //method to remove the auth user from secure storage and navigate the login
   const logout = async () => {
-    await authStorage.deleteItem("authUser");
+    await session.clearSession();
     navigation.replace("login");
-  };
-
-  var myHeaders = new Headers();
-  myHeaders.append("x-auth-token", authUser.token);
-
-  var requestOptions = {
-    method: "GET",
-    headers: myHeaders,
-    redirect: "follow",
   };
 
   //method the fetch the statistics from server using API call
   const fetchStats = () => {
-    fetch(`${network.serverip}/dashboard`, requestOptions)
-      .then((response) => response.json())
+    api
+      .getDashboard()
       .then((result) => {
         if (result.success == true) {
           //set the fetched data to Data state
@@ -87,9 +79,6 @@ const DashboardScreen = ({ navigation, route }) => {
           setIsloading(false);
         } else {
           console.log(result.err);
-          if (result.err == "jwt expired") {
-            logout();
-          }
           setError(result.message);
           setIsloading(false);
         }

@@ -10,6 +10,7 @@ import {
 } from "react-native";
 import React, { useState, useEffect } from "react";
 import { colors, network } from "../../constants";
+import * as api from "../../api";
 import { Ionicons } from "@expo/vector-icons";
 import { AntDesign } from "@expo/vector-icons";
 import CustomAlert from "../../components/CustomAlert/CustomAlert";
@@ -19,17 +20,6 @@ import CategoryList from "../../components/CategoryList";
 
 const ViewCategoryScreen = ({ navigation, route }) => {
   const { authUser } = route.params;
-  const [user, setUser] = useState({});
-
-  const getToken = (obj) => {
-    try {
-      setUser(JSON.parse(obj));
-    } catch (e) {
-      setUser(obj);
-      return obj.token;
-    }
-    return JSON.parse(obj).token;
-  };
 
   const [isloading, setIsloading] = useState(false);
   const [refeshing, setRefreshing] = useState(false);
@@ -56,17 +46,9 @@ const ViewCategoryScreen = ({ navigation, route }) => {
   };
   //method to delete the specific catgeory
   const handleDelete = (id) => {
-    var myHeaders = new Headers();
-    myHeaders.append("x-auth-token", getToken(authUser));
-
-    var requestOptions = {
-      method: "GET",
-      headers: myHeaders,
-      redirect: "follow",
-    };
     setIsloading(true);
-    fetch(`${network.serverip}/delete-category?id=${id}`, requestOptions) // API call
-      .then((response) => response.json())
+    api
+      .deleteCategory(id) // API call
       .then((result) => {
         if (result.success) {
           fetchCategories();
@@ -106,17 +88,9 @@ const ViewCategoryScreen = ({ navigation, route }) => {
 
   //method the fetch the catgeories from server using API call
   const fetchCategories = () => {
-    var myHeaders = new Headers();
-    myHeaders.append("x-auth-token", getToken(authUser));
-
-    var requestOptions = {
-      method: "GET",
-      headers: myHeaders,
-      redirect: "follow",
-    };
     setIsloading(true);
-    fetch(`${network.serverip}/categories`, requestOptions)
-      .then((response) => response.json())
+    api
+      .getCategories()
       .then((result) => {
         if (result.success) {
           setCategories(result.categories);

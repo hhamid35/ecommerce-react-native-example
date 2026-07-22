@@ -6,7 +6,7 @@ import {
 } from "react-native";
 import React, { useEffect, useState } from "react";
 import { colors } from "../../constants";
-import { network } from "../../constants";
+import * as api from "../../api";
 import { useSelector, useDispatch } from "react-redux";
 import { bindActionCreators } from "redux";
 import * as actionCreaters from "../../states/actionCreaters/actionCreaters";
@@ -49,14 +49,9 @@ const HomeScreen = ({ navigation, route }) => {
     addCartItem(product);
   };
 
-  var headerOptions = {
-    method: "GET",
-    redirect: "follow",
-  };
-
   const fetchProduct = () => {
-    fetch(`${network.serverip}/products`, headerOptions) //API call
-      .then((response) => response.json())
+    api
+      .getProducts() //API call
       .then((result) => {
         if (result.success) {
           setProducts(result.data);

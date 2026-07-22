@@ -9,7 +9,8 @@ import {
   TouchableOpacity,
 } from "react-native";
 import React, { useState, useEffect } from "react";
-import { colors, network } from "../../constants";
+import { colors } from "../../constants";
+import * as api from "../../api";
 import CustomInput from "../../components/CustomInput";
 import CustomButton from "../../components/CustomButton";
 import { Ionicons } from "@expo/vector-icons";
@@ -30,23 +31,6 @@ const EditCategoryScreen = ({ navigation, route }) => {
 
   //Method to post the data to server to edit the category using API call
   const editCategoryHandle = (id) => {
-    var myHeaders = new Headers();
-    myHeaders.append("x-auth-token", authUser.token);
-    myHeaders.append("Content-Type", "application/json");
-
-    var raw = JSON.stringify({
-      title: title,
-      image: image,
-      description: description,
-    });
-
-    var requestOptions = {
-      method: "POST",
-      headers: myHeaders,
-      body: raw,
-      redirect: "follow",
-    };
-
     setIsloading(true);
     //[check validations] -- Start
     if (title == "") {
@@ -60,8 +44,8 @@ const EditCategoryScreen = ({ navigation, route }) => {
       setIsloading(false);
     } else {
       //[check validations] -- End
-      fetch(`${network.serverip}/update-category?id=${id}`, requestOptions)
-        .then((response) => response.json())
+      api
+        .updateCategory(id, { title, image, description })
         .then((result) => {
           console.log(result);
           if (result.success == true) {

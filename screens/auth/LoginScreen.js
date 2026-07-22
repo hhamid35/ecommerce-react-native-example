@@ -9,32 +9,15 @@ import {
 } from "react-native";
 
 import React, { useState } from "react";
-import { colors, network } from "../../constants";
+import { colors } from "../../constants";
 import CustomInput from "../../components/CustomInput";
 import header_logo from "../../assets/logo/logo.png";
 import CustomButton from "../../components/CustomButton";
 import CustomAlert from "../../components/CustomAlert/CustomAlert";
 import ProgressDialog from "react-native-progress-dialog";
 import ConnectionAlert from "../../components/ConnectionAlert/ConnectionAlert";
-import * as authStorage from "../../utils/authStorage";
-
-// Hardcoded credentials
-const HARDCODED_USERS = [
-  {
-    _id: "admin001",
-    name: "Admin User",
-    email: "admin@easybuy.com",
-    password: "admin123",
-    userType: "ADMIN",
-  },
-  {
-    _id: "user001",
-    name: "Regular User",
-    email: "user@easybuy.com",
-    password: "user123",
-    userType: "USER",
-  },
-];
+import * as api from "../../api";
+import * as session from "../../utils/session";
 
 const LoginScreen = ({ navigation }) => {
   const [email, setEmail] = useState("");
@@ -42,18 +25,8 @@ const LoginScreen = ({ navigation }) => {
   const [error, setError] = useState("");
   const [isloading, setIsloading] = useState(false);
 
-  //method to store the authUser to secure storage
-  const _storeData = async (user) => {
-    try {
-      await authStorage.setItem("authUser", JSON.stringify(user));
-    } catch (error) {
-      console.log(error);
-      setError(error);
-    }
-  };
-
   //method to validate the user credentials and navigate to Home Screen / Dashboard
-  const loginHandle = () => {
+  const loginHandle = async () => {
     setIsloading(true);
     //[check validation] -- Start
     if (email == "") {
@@ -78,22 +51,26 @@ const LoginScreen = ({ navigation }) => {
     }
     //[check validation] -- End
 
-    // Hardcoded credential check (bypasses API)
-    const matchedUser = HARDCODED_USERS.find(
-      (u) => u.email === email && u.password === password
-    );
-
-    if (matchedUser) {
-      _storeData(matchedUser);
-      setIsloading(false);
-      if (matchedUser.userType === "ADMIN") {
-        navigation.replace("dashboard", { authUser: matchedUser });
+    // Authenticate against the backend (real JWT). Works against either the
+    // Node backend or the mock-server via the shared /login contract.
+    try {
+      const result = await api.login(email, password);
+      if (result.success) {
+        const user = result.data;
+        await session.setSession(user);
+        setIsloading(false);
+        if (user.userType === "ADMIN") {
+          navigation.replace("dashboard", { authUser: user });
+        } else {
+          navigation.replace("tab", { user: user });
+        }
       } else {
-        navigation.replace("tab", { user: matchedUser });
+        setIsloading(false);
+        setError(result.message || "Invalid email or password");
       }
-    } else {
+    } catch (err) {
       setIsloading(false);
-      setError("Invalid email or password");
+      setError(err.message);
     }
   };
 

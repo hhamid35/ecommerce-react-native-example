@@ -9,13 +9,14 @@ import {
   TouchableOpacity,
 } from "react-native";
 import React, { useState } from "react";
-import { colors, network } from "../../constants";
+import { colors } from "../../constants";
 import CustomInput from "../../components/CustomInput";
 import header_logo from "../../assets/logo/logo.png";
 import CustomButton from "../../components/CustomButton";
 import { Ionicons } from "@expo/vector-icons";
 import CustomAlert from "../../components/CustomAlert/CustomAlert";
 import ConnectionAlert from "../../components/ConnectionAlert/ConnectionAlert";
+import * as api from "../../api";
 
 const SignupScreen = ({ navigation }) => {
   const [email, setEmail] = useState("");
@@ -23,23 +24,6 @@ const SignupScreen = ({ navigation }) => {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [name, setName] = useState("");
   const [error, setError] = useState("");
-
-  var myHeaders = new Headers();
-  myHeaders.append("Content-Type", "application/json");
-
-  var raw = JSON.stringify({
-    email: email,
-    password: password,
-    name: name,
-    userType: "USER",
-  });
-
-  var requestOptions = {
-    method: "POST",
-    headers: myHeaders,
-    body: raw,
-    redirect: "follow",
-  };
 
   //method to post the user data to server for user signup using API call
   const signUpHandle = () => {
@@ -64,11 +48,11 @@ const SignupScreen = ({ navigation }) => {
     if (password != confirmPassword) {
       return setError("password does not match");
     }
-    fetch(network.serverip + "/register", requestOptions) // API call
-      .then((response) => response.json())
+    api
+      .register({ email, password, name, userType: "USER" }) // API call
       .then((result) => {
         console.log(result);
-        if (result.data["email"] == email) {
+        if (result.data?.email == email) {
           navigation.navigate("login");
         }
       })

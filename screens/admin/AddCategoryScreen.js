@@ -9,7 +9,8 @@ import {
   TouchableOpacity,
 } from "react-native";
 import React, { useState } from "react";
-import { colors, network } from "../../constants";
+import { colors } from "../../constants";
+import * as api from "../../api";
 import CustomInput from "../../components/CustomInput";
 import CustomButton from "../../components/CustomButton";
 import { Ionicons } from "@expo/vector-icons";
@@ -28,36 +29,8 @@ const AddCategoryScreen = ({ navigation, route }) => {
   const [alertType, setAlertType] = useState("error");
   const [user, setUser] = useState({});
 
-  //method to convert the authUser to json object.
-  const getToken = (obj) => {
-    try {
-      setUser(JSON.parse(obj));
-    } catch (e) {
-      setUser(obj);
-      return obj.token;
-    }
-    return JSON.parse(obj).token;
-  };
-
   //Method for imput validation post data to server to insert category using API call
   const addCategoryHandle = () => {
-    var myHeaders = new Headers();
-    myHeaders.append("x-auth-token", authUser.token);
-    myHeaders.append("Content-Type", "application/json");
-
-    var raw = JSON.stringify({
-      title: title,
-      image: image,
-      description: description,
-    });
-
-    var requestOptions = {
-      method: "POST",
-      headers: myHeaders,
-      body: raw,
-      redirect: "follow",
-    };
-
     setIsloading(true);
     //[check validation] -- Start
     if (title == "") {
@@ -71,8 +44,8 @@ const AddCategoryScreen = ({ navigation, route }) => {
       setIsloading(false);
     } else {
       //[check validation] -- End
-      fetch(network.serverip + "/category", requestOptions) //API call
-        .then((response) => response.json())
+      api
+        .createCategory({ title, image, description }) //API call
         .then((result) => {
           console.log(result);
           if (result.success == true) {

@@ -9,7 +9,8 @@ import {
   TouchableOpacity,
 } from "react-native";
 import React, { useState } from "react";
-import { colors, network } from "../../constants";
+import { colors } from "../../constants";
+import * as api from "../../api";
 import CustomInput from "../../components/CustomInput";
 import CustomButton from "../../components/CustomButton";
 import { Ionicons } from "@expo/vector-icons";
@@ -42,35 +43,15 @@ const AddProductScreen = ({ navigation, route }) => {
     { label: "Shipped", value: "shipped" },
     { label: "Delivered", value: "delivered" },
   ]);
-  var payload = [];
-
-  //method to convert the authUser to json object.
-  const getToken = (obj) => {
-    try {
-      setUser(JSON.parse(obj));
-    } catch (e) {
-      setUser(obj);
-      return obj.token;
-    }
-    return JSON.parse(obj).token;
-  };
-
   //Method : Fetch category data from using API call and store for later you in code
   const fetchCategories = () => {
-    var myHeaders = new Headers();
-    myHeaders.append("x-auth-token", getToken(authUser));
-
-    var requestOptions = {
-      method: "GET",
-      headers: myHeaders,
-      redirect: "follow",
-    };
     setIsloading(true);
-    fetch(`${network.serverip}/categories`, requestOptions)
-      .then((response) => response.json())
+    api
+      .getCategories()
       .then((result) => {
         if (result.success) {
           setCategories(result.categories);
+          let payload = [];
           result.categories.forEach((cat) => {
             let obj = {
               label: cat.title,
@@ -92,48 +73,18 @@ const AddProductScreen = ({ navigation, route }) => {
       });
   };
 
-  var myHeaders = new Headers();
-  myHeaders.append("x-auth-token", authUser.token);
-  myHeaders.append("Content-Type", "application/json");
-
   const upload = async () => {
     console.log("upload-F:", image);
 
     var formdata = new FormData();
     formdata.append("photos", image, "product.png");
 
-    var ImageRequestOptions = {
-      method: "POST",
-      body: formdata,
-      redirect: "follow",
-    };
-
-    fetch(
-      "https://api-easybuy.herokuapp.com/photos/upload",
-      ImageRequestOptions
-    )
-      .then((response) => response.json())
+    api
+      .uploadPhoto(formdata)
       .then((result) => {
         console.log(result);
       })
       .catch((error) => console.log("error", error));
-  };
-
-  var raw = JSON.stringify({
-    title: title,
-    sku: sku,
-    price: price,
-    image: image,
-    description: description,
-    category: category,
-    quantity: quantity,
-  });
-
-  var requestOptions = {
-    method: "POST",
-    headers: myHeaders,
-    body: raw,
-    redirect: "follow",
   };
 
   //Method for selecting the image from device gallery
@@ -172,8 +123,16 @@ const AddProductScreen = ({ navigation, route }) => {
       setIsloading(false);
     } else {
       //[check validation] -- End
-      fetch(network.serverip + "/product", requestOptions)
-        .then((response) => response.json())
+      api
+        .createProduct({
+          title: title,
+          sku: sku,
+          price: price,
+          image: image,
+          description: description,
+          category: category,
+          quantity: quantity,
+        })
         .then((result) => {
           console.log(result);
           if (result.success == true) {

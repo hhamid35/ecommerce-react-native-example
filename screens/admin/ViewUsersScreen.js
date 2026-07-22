@@ -8,7 +8,8 @@ import {
   RefreshControl,
 } from "react-native";
 import React, { useState, useEffect } from "react";
-import { colors, network } from "../../constants";
+import { colors } from "../../constants";
+import * as api from "../../api";
 import { Ionicons } from "@expo/vector-icons";
 import { AntDesign } from "@expo/vector-icons";
 import CustomAlert from "../../components/CustomAlert/CustomAlert";
@@ -18,8 +19,6 @@ import UserList from "../../components/UserList/UserList";
 
 const ViewUsersScreen = ({ navigation, route }) => {
   const [name, setName] = useState("");
-  const { authUser } = route.params;
-  const [user, setUser] = useState({});
   const [isloading, setIsloading] = useState(false);
   const [refeshing, setRefreshing] = useState(false);
   const [alertType, setAlertType] = useState("error");
@@ -29,30 +28,11 @@ const ViewUsersScreen = ({ navigation, route }) => {
   const [foundItems, setFoundItems] = useState([]);
   const [filterItem, setFilterItem] = useState("");
 
-  //method to convert the authUser to json object
-  const getToken = (obj) => {
-    try {
-      setUser(JSON.parse(obj));
-    } catch (e) {
-      setUser(obj);
-      return obj.token;
-    }
-    return JSON.parse(obj).token;
-  };
-
   //method the fetch the users from server using API call
   const fetchUsers = () => {
-    var myHeaders = new Headers();
-    myHeaders.append("x-auth-token", getToken(authUser));
-
-    var requestOptions = {
-      method: "GET",
-      headers: myHeaders,
-      redirect: "follow",
-    };
     setIsloading(true);
-    fetch(`${network.serverip}/admin/users`, requestOptions)
-      .then((response) => response.json())
+    api
+      .getUsers()
       .then((result) => {
         if (result.success) {
           setUsers(result.data);
