@@ -1,4 +1,5 @@
 import { get, post } from "./client";
+import { toScanResolution } from "../utils/scanCodes";
 
 // The backend seam: named operations screens call instead of building fetch.
 // Each returns the parsed response body ({ success, data / categories, message,
@@ -20,6 +21,26 @@ export const deleteUser = (userId) => get(`/delete-user?id=${q(userId)}`);
 // ---- Products ----
 export const getProducts = (search) =>
   get(`/products${search ? `?search=${q(search)}` : ""}`);
+
+export const resolveScannedProduct = async (rawCode) => {
+  try {
+    const result = await getProducts();
+    if (!result.success || !Array.isArray(result.data)) {
+      return {
+        success: false,
+        code: "SCAN_CATALOG_UNAVAILABLE",
+        message: result.message || "Unable to check the catalog right now",
+      };
+    }
+    return toScanResolution(result.data, rawCode);
+  } catch (error) {
+    return {
+      success: false,
+      code: "SCAN_CATALOG_UNAVAILABLE",
+      message: "Unable to check the catalog right now",
+    };
+  }
+};
 export const createProduct = (payload) => post("/product", payload);
 export const updateProduct = (id, payload) =>
   post(`/update-product?id=${q(id)}`, payload);
@@ -55,4 +76,4 @@ export const uploadPhoto = (formData) => post("/photos/upload", formData);
 
 // Re-export the base-URL resolver so screens can build image URLs through
 // the same seam that decides where the backend lives.
-export { getBaseUrl, imageUrl } from "./config";
+export { getBaseUrl, imageUrl, isScanToProductEnabled } from "./config";

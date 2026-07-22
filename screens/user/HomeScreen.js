@@ -7,6 +7,7 @@ import {
 import React, { useEffect, useState } from "react";
 import { colors } from "../../constants";
 import * as api from "../../api";
+import { isScanToProductEnabled } from "../../api/config";
 import { useSelector, useDispatch } from "react-redux";
 import { bindActionCreators } from "redux";
 import * as actionCreaters from "../../states/actionCreaters/actionCreaters";
@@ -42,6 +43,13 @@ const HomeScreen = ({ navigation, route }) => {
   //method to navigate to product detail screen of a specific product
   const handleProductPress = (product) => {
     navigation.navigate("productdetail", { product: product });
+  };
+
+  const handleScanPress = () => {
+    if (!isScanToProductEnabled()) {
+      return;
+    }
+    navigation.navigate("scanproduct", { source: "home" });
   };
 
   //method to add to cart (redux)
@@ -93,6 +101,8 @@ const HomeScreen = ({ navigation, route }) => {
         <SearchBar
           searchItems={searchItems}
           handleProductPress={handleProductPress}
+          onScanPress={handleScanPress}
+          scanEnabled={isScanToProductEnabled()}
         />
         <ScrollView nestedScrollEnabled={true} testID="home-scroll">
           <PromotionSlider slides={slides} />
