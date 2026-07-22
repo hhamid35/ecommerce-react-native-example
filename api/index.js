@@ -13,6 +13,9 @@ const q = (value) => encodeURIComponent(value);
 // ---- Auth / users ----
 export const register = (payload) => post("/register", payload);
 export const login = (email, password) => post("/login", { email, password });
+export const requestPasswordReset = (email) => post("/forgot-password", { email });
+export const completePasswordReset = (payload) =>
+  post("/complete-password-reset", payload);
 export const resetPassword = (userId, body) =>
   post(`/reset-password?id=${q(userId)}`, body);
 export const deleteUser = (userId) => get(`/delete-user?id=${q(userId)}`);

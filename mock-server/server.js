@@ -47,6 +47,10 @@ let users = [
   },
 ];
 
+const PREVIEW_RESET_OTP = "123456";
+const OTP_TTL_MS = 20 * 60 * 1000;
+const passwordResetOtps = new Map();
+
 let categories = [
   {
     _id: "62fe244f58f7aa8230817f89",
@@ -563,6 +567,124 @@ app.post("/reset-password", (req, res) => {
   res.json({ success: true, message: "Password updated successfully" });
 });
 
+function isValidRecoveryEmail(email) {
+  return typeof email === "string" && email.includes("@") && email.includes(".") && email.length >= 6;
+}
+
+function isValidRecoveryPassword(password) {
+  return (
+    typeof password === "string" &&
+    password.length >= 8 &&
+    /[a-zA-Z]/.test(password) &&
+    /\d/.test(password)
+  );
+}
+
+// POST /forgot-password
+app.post("/forgot-password", (req, res) => {
+  const { email } = req.body;
+  if (!isValidRecoveryEmail(email)) {
+    return res.status(400).json({
+      success: false,
+      message: "Please enter a valid email address",
+    });
+  }
+
+  const normalizedEmail = email.trim().toLowerCase();
+  const user = users.find((u) => u.email === normalizedEmail);
+  if (user) {
+    const expiresAt = Date.now() + OTP_TTL_MS;
+    passwordResetOtps.set(normalizedEmail, {
+      otp: PREVIEW_RESET_OTP,
+      expiresAt,
+      attempts: 0,
+    });
+    console.log(
+      `[mock] Password reset OTP for ${normalizedEmail}: ${PREVIEW_RESET_OTP} (expires in 20 minutes)`
+    );
+  }
+
+  return res.json({
+    success: true,
+    message:
+      "If an account exists for that email, password reset instructions have been sent.",
+  });
+});
+
+// POST /complete-password-reset
+app.post("/complete-password-reset", (req, res) => {
+  const { email, otp, newPassword } = req.body;
+  if (!isValidRecoveryEmail(email)) {
+    return res.status(400).json({
+      success: false,
+      message: "Please enter a valid email address",
+    });
+  }
+  if (!/^\d{6}$/.test(String(otp || ""))) {
+    return res.status(400).json({
+      success: false,
+      message: "Reset code is invalid or expired. Request a new code and try again.",
+    });
+  }
+  if (!isValidRecoveryPassword(newPassword)) {
+    return res.status(400).json({
+      success: false,
+      message: "Password must be at least 8 characters and include a letter and a number",
+    });
+  }
+
+  const normalizedEmail = email.trim().toLowerCase();
+  const stored = passwordResetOtps.get(normalizedEmail);
+  if (!stored || stored.expiresAt <= Date.now()) {
+    return res.status(400).json({
+      success: false,
+      message: "Reset code is invalid or expired. Request a new code and try again.",
+    });
+  }
+
+  stored.attempts += 1;
+  if (stored.attempts > 5) {
+    passwordResetOtps.delete(normalizedEmail);
+    return res.status(400).json({
+      success: false,
+      message: "Reset code is invalid or expired. Request a new code and try again.",
+    });
+  }
+
+  if (String(otp) !== stored.otp) {
+    return res.status(400).json({
+      success: false,
+      message: "Reset code is invalid or expired. Request a new code and try again.",
+    });
+  }
+
+  const user = users.find((u) => u.email === normalizedEmail);
+  if (!user) {
+    passwordResetOtps.delete(normalizedEmail);
+    return res.status(400).json({
+      success: false,
+      message: "Reset code is invalid or expired. Request a new code and try again.",
+    });
+  }
+
+  if (user.password === newPassword) {
+    return res.status(400).json({
+      success: false,
+      message: "New password must be different from your previous password",
+    });
+  }
+
+  user.password = newPassword;
+  user.token = null;
+  passwordResetOtps.delete(normalizedEmail);
+
+  return res.json({
+    success: true,
+    message: "Password reset successfully. Please log in with your new password.",
+    returnTo: "login",
+  });
+});
+
 // POST /photos/upload
 app.post("/photos/upload", upload.single("photos"), (req, res) => {
   if (!req.file) {
@@ -616,6 +738,8 @@ app.listen(PORT, "0.0.0.0", () => {
   console.log(`   POST   /checkout             (user)`);
   console.log(`   GET    /delete-user?id=`);
   console.log(`   POST   /reset-password?id=`);
+  console.log(`   POST   /forgot-password`);
+  console.log(`   POST   /complete-password-reset`);
   console.log(`   POST   /photos/upload`);
   console.log(`   GET    /uploads/:filename`);
   console.log(`\n🔑 Test tokens:`);
@@ -623,7 +747,9 @@ app.listen(PORT, "0.0.0.0", () => {
   console.log(`   User token  : mock-user-token-001`);
   console.log(`\n👤 Test credentials:`);
   console.log(`   Admin  → email: admin@easybuy.com  | password: admin123`);
-  console.log(`   User   → email: user@easybuy.com   | password: user123\n`);
+  console.log(`   User   → email: user@easybuy.com   | password: user123`);
+  console.log(`\n🔐 Password recovery preview:`);
+  console.log(`   Request OTP at POST /forgot-password, then use code ${PREVIEW_RESET_OTP} at POST /complete-password-reset\n`);
 });
 
 // Made with Bob
