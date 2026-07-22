@@ -8,7 +8,7 @@ import {
   ScrollView,
 } from "react-native";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { colors } from "../../constants";
 import CustomInput from "../../components/CustomInput";
 import header_logo from "../../assets/logo/logo.png";
@@ -19,15 +19,26 @@ import ConnectionAlert from "../../components/ConnectionAlert/ConnectionAlert";
 import * as api from "../../api";
 import * as session from "../../utils/session";
 
-const LoginScreen = ({ navigation }) => {
+const LoginScreen = ({ navigation, route }) => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [alertType, setAlertType] = useState("error");
   const [isloading, setIsloading] = useState(false);
+
+  useEffect(() => {
+    const recoveryMessage = route?.params?.passwordResetMessage;
+    if (recoveryMessage) {
+      setError(recoveryMessage);
+      setAlertType("success");
+    }
+  }, [route?.params?.passwordResetMessage]);
 
   //method to validate the user credentials and navigate to Home Screen / Dashboard
   const loginHandle = async () => {
     setIsloading(true);
+    setError("");
+    setAlertType("error");
     //[check validation] -- Start
     if (email == "") {
       setIsloading(false);
@@ -99,7 +110,7 @@ const LoginScreen = ({ navigation }) => {
             <Text style={styles.screenNameText} testID="login-heading">Login</Text>
           </View>
           <View style={styles.formContainer}>
-            <CustomAlert message={error} type={"error"} testID="login-alert" />
+            <CustomAlert message={error} type={alertType} testID="login-alert" />
             <CustomInput
               value={email}
               setValue={setEmail}

@@ -42,7 +42,7 @@ const SignupScreen = ({ navigation }) => {
     if (email.length < 6) {
       return setError("Email is too short");
     }
-    if (password.length < 5) {
+    if (password.length < 6) {
       return setError("Password must be 6 characters long");
     }
     if (password != confirmPassword) {
