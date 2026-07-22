@@ -8,34 +8,29 @@ const mockNavigate = jest.fn();
 const mockGoBack = jest.fn();
 const mockRequestPermission = jest.fn();
 
-jest.mock("@expo/vector-icons", () => {
-  const React = require("react");
-  const { Text } = require("react-native");
+jest.mock(
+  "expo-camera",
+  () => {
+    const React = require("react");
+    const { View, Text, TouchableOpacity } = require("react-native");
 
-  return {
-    Ionicons: (props) => <Text testID={props.testID}>{props.name}</Text>,
-  };
-});
-
-jest.mock("expo-camera", () => {
-  const React = require("react");
-  const { View, Text, TouchableOpacity } = require("react-native");
-
-  return {
-    useCameraPermissions: jest.fn(),
-    CameraView: ({ onBarcodeScanned, children, testID }) => (
-      <View testID={testID}>
-        <TouchableOpacity
-          testID="mock-barcode-trigger"
-          onPress={() => onBarcodeScanned?.({ data: "GAR-001", type: "qr" })}
-        >
-          <Text>Scan</Text>
-        </TouchableOpacity>
-        {children}
-      </View>
-    ),
-  };
-});
+    return {
+      useCameraPermissions: jest.fn(),
+      CameraView: ({ onBarcodeScanned, children, testID }) => (
+        <View testID={testID}>
+          <TouchableOpacity
+            testID="mock-barcode-trigger"
+            onPress={() => onBarcodeScanned?.({ data: "GAR-001", type: "qr" })}
+          >
+            <Text>Scan</Text>
+          </TouchableOpacity>
+          {children}
+        </View>
+      ),
+    };
+  },
+  { virtual: true }
+);
 
 jest.mock("../api", () => ({
   resolveProductByScanCode: jest.fn(),
