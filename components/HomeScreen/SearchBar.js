@@ -4,7 +4,9 @@ import SearchableDropdown from "react-native-searchable-dropdown";
 import { colors } from "../../constants";
 import scanIcon from "../../assets/icons/scan_icons.png";
 
-const SearchBar = ({ searchItems, handleProductPress }) => {
+const SearchBar = ({ searchItems, handleProductPress, handleScanPress = () => {} }) => {
+  const scanEnabled = process.env.EXPO_PUBLIC_ENABLE_SCAN_PRODUCT !== "false";
+
   return (
     <View style={styles.searchContainer} testID="search-bar">
       <View style={styles.inputContainer} testID="search-bar-input-container">
@@ -48,10 +50,16 @@ const SearchBar = ({ searchItems, handleProductPress }) => {
         />
       </View>
       <View style={styles.buttonContainer}>
-        <TouchableOpacity style={styles.scanButton} testID="search-bar-scan-btn">
+        {scanEnabled ? (
+        <TouchableOpacity
+          style={styles.scanButton}
+          testID="search-bar-scan-btn"
+          onPress={handleScanPress}
+        >
           <Text style={styles.scanButtonText} testID="search-bar-scan-text">Scan</Text>
           <Image source={scanIcon} style={{ width: 20, height: 20 }} testID="search-bar-scan-icon" />
         </TouchableOpacity>
+        ) : null}
       </View>
     </View>
   );
