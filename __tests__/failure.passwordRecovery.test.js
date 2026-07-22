@@ -29,6 +29,6 @@ describe("password recovery API helpers", () => {
       newPassword: "newpass123",
     };
     await api.completePasswordReset(payload);
-    expect(post).toHaveBeenCalledWith("/password-reset", payload);
+    expect(post).toHaveBeenCalledWith("/complete-password-reset", payload);
   });
 });
