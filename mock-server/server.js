@@ -47,6 +47,8 @@ let users = [
   },
 ];
 
+let passwordResetOtps = [];
+
 let categories = [
   {
     _id: "62fe244f58f7aa8230817f89",
@@ -307,6 +309,41 @@ const adminMiddleware = (req, res, next) => {
 
 // ─── Routes ───────────────────────────────────────────────────────────────────
 
+const OTP_TTL_MINUTES = 10;
+const MAX_OTP_ATTEMPTS = 5;
+const NEUTRAL_RESET_MESSAGE =
+  "If an account exists, reset instructions have been sent.";
+
+function normalizeEmail(email) {
+  return String(email || "")
+    .trim()
+    .toLowerCase();
+}
+
+function isValidEmail(email) {
+  return email.includes("@") && email.length >= 6;
+}
+
+function generateOtp() {
+  return String(Math.floor(100000 + Math.random() * 900000));
+}
+
+function invalidateActiveOtps(email) {
+  const now = Date.now();
+  passwordResetOtps.forEach((entry) => {
+    if (entry.email === email && !entry.usedAt && entry.expiresAt > now) {
+      entry.usedAt = now;
+    }
+  });
+}
+
+function findActiveOtp(email) {
+  const now = Date.now();
+  return passwordResetOtps
+    .filter((entry) => entry.email === email && !entry.usedAt && entry.expiresAt > now)
+    .sort((a, b) => b.createdAt - a.createdAt)[0];
+}
+
 // POST /register
 app.post("/register", (req, res) => {
   const { email, password, name, userType } = req.body;
@@ -338,6 +375,103 @@ app.post("/login", (req, res) => {
   }
   const { password: _, ...safeUser } = user;
   res.json({ success: true, message: "Login successful", data: safeUser });
+});
+
+// POST /forgot-password
+app.post("/forgot-password", (req, res) => {
+  const email = normalizeEmail(req.body.email);
+  if (!isValidEmail(email)) {
+    return res.status(400).json({ success: false, message: "Email is not valid" });
+  }
+
+  const user = users.find((u) => u.email === email);
+  invalidateActiveOtps(email);
+
+  const response = {
+    success: true,
+    message: NEUTRAL_RESET_MESSAGE,
+    data: { expiresInMinutes: OTP_TTL_MINUTES, deliveryMethod: "email" },
+  };
+
+  if (user) {
+    const otp = generateOtp();
+    passwordResetOtps.push({
+      email,
+      otp,
+      expiresAt: Date.now() + OTP_TTL_MINUTES * 60 * 1000,
+      usedAt: null,
+      attempts: 0,
+      createdAt: Date.now(),
+    });
+    response.debugOtp = otp;
+  }
+
+  res.json(response);
+});
+
+// POST /reset-forgotten-password
+app.post("/reset-forgotten-password", (req, res) => {
+  const email = normalizeEmail(req.body.email);
+  const { otp, newPassword } = req.body;
+
+  if (!email || !otp || !newPassword) {
+    return res.status(400).json({
+      success: false,
+      message: "Email, code, and new password are required",
+    });
+  }
+
+  if (!isValidEmail(email)) {
+    return res.status(400).json({ success: false, message: "Email is not valid" });
+  }
+
+  if (!newPassword || newPassword.length < 6) {
+    return res.status(400).json({
+      success: false,
+      message: "Password must be 6 characters long",
+    });
+  }
+
+  const activeOtp = findActiveOtp(email);
+  if (!activeOtp) {
+    return res.status(400).json({
+      success: false,
+      message: "Reset code is invalid or expired",
+    });
+  }
+
+  if (activeOtp.attempts >= MAX_OTP_ATTEMPTS) {
+    return res.status(429).json({
+      success: false,
+      message: "Too many invalid attempts. Request a new code.",
+    });
+  }
+
+  if (String(otp) !== String(activeOtp.otp)) {
+    activeOtp.attempts += 1;
+    if (activeOtp.attempts >= MAX_OTP_ATTEMPTS) {
+      return res.status(429).json({
+        success: false,
+        message: "Too many invalid attempts. Request a new code.",
+      });
+    }
+    return res.status(400).json({
+      success: false,
+      message: "Reset code is invalid or expired",
+    });
+  }
+
+  const user = users.find((u) => u.email === email);
+  if (!user) {
+    return res.status(400).json({
+      success: false,
+      message: "Reset code is invalid or expired",
+    });
+  }
+
+  user.password = newPassword;
+  activeOtp.usedAt = Date.now();
+  res.json({ success: true, message: "Password reset successfully" });
 });
 
 // GET /products
@@ -600,6 +734,8 @@ app.listen(PORT, "0.0.0.0", () => {
   console.log(`\n📋 Available endpoints:`);
   console.log(`   POST   /register`);
   console.log(`   POST   /login`);
+  console.log(`   POST   /forgot-password`);
+  console.log(`   POST   /reset-forgotten-password`);
   console.log(`   GET    /products`);
   console.log(`   POST   /product              (admin)`);
   console.log(`   POST   /update-product?id=   (admin)`);
