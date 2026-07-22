@@ -20,6 +20,74 @@ export const deleteUser = (userId) => get(`/delete-user?id=${q(userId)}`);
 // ---- Products ----
 export const getProducts = (search) =>
   get(`/products${search ? `?search=${q(search)}` : ""}`);
+
+export const normalizeScanCode = (value) =>
+  String(value || "").trim().toLowerCase();
+
+export const resolveProductByCode = async (code, format) => {
+  const normalizedCode = normalizeScanCode(code);
+
+  if (!normalizedCode) {
+    return {
+      success: false,
+      reason: "invalid-code",
+      message: "No scan code was detected.",
+    };
+  }
+
+  let result;
+  try {
+    result = await getProducts();
+  } catch (error) {
+    console.log("scan_lookup_failed", { reason: "network" });
+    throw error;
+  }
+
+  if (!result?.success || !Array.isArray(result.data)) {
+    console.log("scan_lookup_failed", { reason: "lookup-failed" });
+    return {
+      success: false,
+      reason: "lookup-failed",
+      message: result?.message || "We could not check the catalog. Please try again.",
+    };
+  }
+
+  const matches = result.data.filter((product) => {
+    const sku = normalizeScanCode(product.sku);
+    const externalId = normalizeScanCode(product.externalId);
+    return sku === normalizedCode || externalId === normalizedCode;
+  });
+
+  if (matches.length > 1) {
+    console.log("scan_duplicate_identifier", { count: matches.length });
+    return {
+      success: false,
+      reason: "duplicate-match",
+      message: "More than one product uses this scan code.",
+    };
+  }
+
+  if (matches.length === 0) {
+    return {
+      success: false,
+      reason: "not-found",
+      message: "We could not find a product for this code.",
+    };
+  }
+
+  const product = matches[0];
+  const matchedBy =
+    normalizeScanCode(product.sku) === normalizedCode ? "sku" : "externalId";
+
+  return {
+    success: true,
+    product,
+    code: normalizedCode,
+    format,
+    matchedBy,
+  };
+};
+
 export const createProduct = (payload) => post("/product", payload);
 export const updateProduct = (id, payload) =>
   post(`/update-product?id=${q(id)}`, payload);

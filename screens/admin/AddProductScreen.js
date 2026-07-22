@@ -27,6 +27,7 @@ const AddProductScreen = ({ navigation, route }) => {
   const [title, setTitle] = useState("");
   const [price, setPrice] = useState("");
   const [sku, setSku] = useState("");
+  const [externalId, setExternalId] = useState("");
   const [image, setImage] = useState("");
   const [error, setError] = useState("");
   const [quantity, setQuantity] = useState("");
@@ -127,6 +128,7 @@ const AddProductScreen = ({ navigation, route }) => {
         .createProduct({
           title: title,
           sku: sku,
+          externalId: externalId,
           price: price,
           image: image,
           description: description,
@@ -139,6 +141,10 @@ const AddProductScreen = ({ navigation, route }) => {
             setIsloading(false);
             setAlertType("success");
             setError(result.message);
+          } else {
+            setIsloading(false);
+            setAlertType("error");
+            setError(result.message || "Unable to add product");
           }
         })
         .catch((error) => {
@@ -213,6 +219,14 @@ const AddProductScreen = ({ navigation, route }) => {
             placeholderTextColor={colors.muted}
             radius={5}
             testID="add-product-sku-input"
+          />
+          <CustomInput
+            value={externalId}
+            setValue={setExternalId}
+            placeholder={"External ID / barcode"}
+            placeholderTextColor={colors.muted}
+            radius={5}
+            testID="add-product-external-id-input"
           />
           <CustomInput
             value={title}

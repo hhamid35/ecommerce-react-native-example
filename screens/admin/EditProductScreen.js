@@ -26,6 +26,7 @@ const EditProductScreen = ({ navigation, route }) => {
   const [title, setTitle] = useState("");
   const [price, setPrice] = useState("");
   const [sku, setSku] = useState("");
+  const [externalId, setExternalId] = useState("");
   const [image, setImage] = useState("");
   const [error, setError] = useState("");
   const [quantity, setQuantity] = useState("");
@@ -68,6 +69,7 @@ const EditProductScreen = ({ navigation, route }) => {
         .updateProduct(product._id, {
           title: title,
           sku: sku,
+          externalId: externalId,
           price: price,
           image: image,
           description: description,
@@ -82,6 +84,9 @@ const EditProductScreen = ({ navigation, route }) => {
             setQuantity("");
             setSku("");
             setTitle("");
+          } else {
+            setIsloading(false);
+            setError(result.message || "Unable to update product");
           }
         })
         .catch((error) => {
@@ -97,6 +102,7 @@ const EditProductScreen = ({ navigation, route }) => {
     setImage(`${network.serverip}/uploads/${product?.image}`);
     setTitle(product.title);
     setSku(product.sku);
+    setExternalId(product.externalId || "");
     setQuantity(product.quantity.toString());
     setPrice(product.price.toString());
     setDescription(product.description);
@@ -154,6 +160,14 @@ const EditProductScreen = ({ navigation, route }) => {
             placeholderTextColor={colors.muted}
             radius={5}
             testID="edit-product-sku-input"
+          />
+          <CustomInput
+            value={externalId}
+            setValue={setExternalId}
+            placeholder={"External ID / barcode"}
+            placeholderTextColor={colors.muted}
+            radius={5}
+            testID="edit-product-external-id-input"
           />
           <CustomInput
             value={title}

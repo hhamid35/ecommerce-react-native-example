@@ -79,6 +79,7 @@ let products = [
     _id: "prod001",
     title: "Classic White T-Shirt",
     sku: "GAR-001",
+    externalId: "0123456789012",
     price: 19.99,
     quantity: 50,
     description: "A comfortable everyday white t-shirt made from 100% cotton.",
@@ -92,6 +93,7 @@ let products = [
     _id: "prod002",
     title: "Blue Denim Jeans",
     sku: "GAR-002",
+    externalId: "0123456789013",
     price: 49.99,
     quantity: 30,
     description: "Slim-fit blue denim jeans for a modern look.",
@@ -105,6 +107,7 @@ let products = [
     _id: "prod003",
     title: "Wireless Bluetooth Headphones",
     sku: "ELC-001",
+    externalId: "0123456789014",
     price: 89.99,
     quantity: 20,
     description: "High-quality wireless headphones with noise cancellation.",
@@ -118,6 +121,7 @@ let products = [
     _id: "prod004",
     title: "Smartphone Stand",
     sku: "ELC-002",
+    externalId: "0123456789015",
     price: 14.99,
     quantity: 100,
     description: "Adjustable aluminum smartphone and tablet stand.",
@@ -131,6 +135,7 @@ let products = [
     _id: "prod005",
     title: "Face Moisturizer SPF 30",
     sku: "COS-001",
+    externalId: "0123456789016",
     price: 24.99,
     quantity: 60,
     description: "Daily face moisturizer with SPF 30 sun protection.",
@@ -144,6 +149,7 @@ let products = [
     _id: "prod006",
     title: "Lipstick Set (6 Colors)",
     sku: "COS-002",
+    externalId: "0123456789017",
     price: 34.99,
     quantity: 40,
     description: "Long-lasting matte lipstick set in 6 vibrant shades.",
@@ -157,6 +163,7 @@ let products = [
     _id: "prod007",
     title: "Organic Basmati Rice (5kg)",
     sku: "GRO-001",
+    externalId: "0123456789018",
     price: 12.99,
     quantity: 200,
     description: "Premium organic basmati rice, long grain and aromatic.",
@@ -170,6 +177,7 @@ let products = [
     _id: "prod008",
     title: "Extra Virgin Olive Oil (1L)",
     sku: "GRO-002",
+    externalId: "0123456789019",
     price: 18.99,
     quantity: 80,
     description: "Cold-pressed extra virgin olive oil from Mediterranean farms.",
@@ -305,6 +313,38 @@ const adminMiddleware = (req, res, next) => {
   });
 };
 
+// ─── Identifier helpers ───────────────────────────────────────────────────────
+
+const normalizeIdentifier = (value) => String(value || "").trim().toLowerCase();
+
+const findIdentifierConflict = ({ sku, externalId, excludeId }) => {
+  const normalizedSku = normalizeIdentifier(sku);
+  const normalizedExternalId = normalizeIdentifier(externalId);
+
+  return products.find((product) => {
+    if (excludeId && product._id === excludeId) {
+      return false;
+    }
+
+    const productSku = normalizeIdentifier(product.sku);
+    const productExternalId = normalizeIdentifier(product.externalId);
+
+    if (normalizedSku && productSku && normalizedSku === productSku) {
+      return true;
+    }
+
+    if (
+      normalizedExternalId &&
+      productExternalId &&
+      normalizedExternalId === productExternalId
+    ) {
+      return true;
+    }
+
+    return false;
+  });
+};
+
 // ─── Routes ───────────────────────────────────────────────────────────────────
 
 // POST /register
@@ -347,15 +387,24 @@ app.get("/products", (req, res) => {
 
 // POST /product  (admin: add product)
 app.post("/product", adminMiddleware, (req, res) => {
-  const { title, sku, price, image, description, category, quantity } = req.body;
+  const { title, sku, externalId, price, image, description, category, quantity } = req.body;
   if (!title || !price) {
     return res.status(400).json({ success: false, message: "Title and price are required" });
   }
+
+  if (findIdentifierConflict({ sku, externalId })) {
+    return res.status(400).json({
+      success: false,
+      message: "SKU or external ID must be unique",
+    });
+  }
+
   const cat = categories.find((c) => c._id === category);
   const newProduct = {
     _id: uuidv4(),
     title,
     sku: sku || "",
+    externalId: externalId || "",
     price: parseFloat(price),
     quantity: parseInt(quantity) || 0,
     description: description || "",
@@ -373,12 +422,27 @@ app.post("/update-product", adminMiddleware, (req, res) => {
   if (idx === -1) {
     return res.status(404).json({ success: false, message: "Product not found" });
   }
-  const { title, sku, price, image, description, category, quantity } = req.body;
+  const { title, sku, externalId, price, image, description, category, quantity } = req.body;
+
+  if (
+    findIdentifierConflict({
+      sku: sku !== undefined ? sku : products[idx].sku,
+      externalId: externalId !== undefined ? externalId : products[idx].externalId,
+      excludeId: id,
+    })
+  ) {
+    return res.status(400).json({
+      success: false,
+      message: "SKU or external ID must be unique",
+    });
+  }
+
   const cat = categories.find((c) => c._id === category);
   products[idx] = {
     ...products[idx],
     title: title || products[idx].title,
-    sku: sku || products[idx].sku,
+    sku: sku !== undefined ? sku : products[idx].sku,
+    externalId: externalId !== undefined ? externalId : products[idx].externalId,
     price: price ? parseFloat(price) : products[idx].price,
     quantity: quantity !== undefined ? parseInt(quantity) : products[idx].quantity,
     description: description || products[idx].description,
