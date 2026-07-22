@@ -18,6 +18,76 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage });
 
+function normalizeScanCode(value) {
+  if (value === null || value === undefined) {
+    return "";
+  }
+  return String(value).trim();
+}
+
+function findProductsByScanCode(code) {
+  const normalizedCode = normalizeScanCode(code);
+  const matches = [];
+
+  if (!normalizedCode) {
+    return { normalizedCode, matches };
+  }
+
+  const lowerCode = normalizedCode.toLowerCase();
+
+  products.forEach((product) => {
+    const sku = normalizeScanCode(product.sku);
+    if (sku && sku.toLowerCase() === lowerCode) {
+      matches.push({ product, field: "sku", value: sku });
+    }
+
+    const externalId = normalizeScanCode(product.externalId);
+    if (externalId && externalId.toLowerCase() === lowerCode) {
+      matches.push({ product, field: "externalId", value: externalId });
+    }
+  });
+
+  return { normalizedCode, matches };
+}
+
+function toScanResolution(code) {
+  const { normalizedCode, matches } = findProductsByScanCode(code);
+
+  if (!normalizedCode) {
+    return {
+      success: false,
+      code: "SCAN_CODE_REQUIRED",
+      message: "A valid product code is required",
+    };
+  }
+
+  if (matches.length === 0) {
+    return {
+      success: false,
+      code: "PRODUCT_SCAN_NOT_FOUND",
+      message: "No product found for this code",
+      scannedCode: normalizedCode,
+    };
+  }
+
+  if (matches.length > 1) {
+    return {
+      success: false,
+      code: "PRODUCT_SCAN_AMBIGUOUS",
+      message: "Multiple products match this code",
+      scannedCode: normalizedCode,
+    };
+  }
+
+  const match = matches[0];
+  return {
+    success: true,
+    data: match.product,
+    match: { field: match.field, value: match.value },
+    scannedCode: normalizedCode,
+  };
+}
+
 // ─── In-memory data store ──────────────────────────────────────────────────────
 
 let users = [
@@ -79,6 +149,7 @@ let products = [
     _id: "prod001",
     title: "Classic White T-Shirt",
     sku: "GAR-001",
+    externalId: "0123456789012",
     price: 19.99,
     quantity: 50,
     description: "A comfortable everyday white t-shirt made from 100% cotton.",
@@ -92,6 +163,7 @@ let products = [
     _id: "prod002",
     title: "Blue Denim Jeans",
     sku: "GAR-002",
+    externalId: "EASYBUY-GAR-001",
     price: 49.99,
     quantity: 30,
     description: "Slim-fit blue denim jeans for a modern look.",
@@ -345,9 +417,27 @@ app.get("/products", (req, res) => {
   res.json({ success: true, data: products });
 });
 
+// GET /products/scan?code=  (diagnostic convenience endpoint)
+app.get("/products/scan", (req, res) => {
+  const result = toScanResolution(req.query.code);
+  if (!result.success) {
+    if (result.code === "SCAN_CODE_REQUIRED") {
+      return res.status(400).json(result);
+    }
+    if (result.code === "PRODUCT_SCAN_NOT_FOUND") {
+      return res.status(404).json(result);
+    }
+    if (result.code === "PRODUCT_SCAN_AMBIGUOUS") {
+      return res.status(409).json(result);
+    }
+    return res.status(400).json(result);
+  }
+  return res.json(result);
+});
+
 // POST /product  (admin: add product)
 app.post("/product", adminMiddleware, (req, res) => {
-  const { title, sku, price, image, description, category, quantity } = req.body;
+  const { title, sku, price, image, description, category, quantity, externalId } = req.body;
   if (!title || !price) {
     return res.status(400).json({ success: false, message: "Title and price are required" });
   }
@@ -355,7 +445,8 @@ app.post("/product", adminMiddleware, (req, res) => {
   const newProduct = {
     _id: uuidv4(),
     title,
-    sku: sku || "",
+    sku: normalizeScanCode(sku),
+    externalId: normalizeScanCode(externalId),
     price: parseFloat(price),
     quantity: parseInt(quantity) || 0,
     description: description || "",
@@ -373,12 +464,16 @@ app.post("/update-product", adminMiddleware, (req, res) => {
   if (idx === -1) {
     return res.status(404).json({ success: false, message: "Product not found" });
   }
-  const { title, sku, price, image, description, category, quantity } = req.body;
+  const { title, sku, price, image, description, category, quantity, externalId } = req.body;
   const cat = categories.find((c) => c._id === category);
   products[idx] = {
     ...products[idx],
     title: title || products[idx].title,
-    sku: sku || products[idx].sku,
+    sku: sku !== undefined ? normalizeScanCode(sku) : products[idx].sku,
+    externalId:
+      externalId !== undefined
+        ? normalizeScanCode(externalId)
+        : products[idx].externalId || "",
     price: price ? parseFloat(price) : products[idx].price,
     quantity: quantity !== undefined ? parseInt(quantity) : products[idx].quantity,
     description: description || products[idx].description,
@@ -601,6 +696,7 @@ app.listen(PORT, "0.0.0.0", () => {
   console.log(`   POST   /register`);
   console.log(`   POST   /login`);
   console.log(`   GET    /products`);
+  console.log(`   GET    /products/scan?code=`);
   console.log(`   POST   /product              (admin)`);
   console.log(`   POST   /update-product?id=   (admin)`);
   console.log(`   GET    /delete-product?id=   (admin)`);

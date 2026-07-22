@@ -40,3 +40,8 @@ export function getBaseUrl() {
 export function imageUrl(filename) {
   return `${getBaseUrl()}/uploads/${filename}`;
 }
+
+// Scan-to-product is enabled unless explicitly disabled via public env flag.
+export function isScanToProductEnabled() {
+  return process.env.EXPO_PUBLIC_ENABLE_SCAN_TO_PRODUCT !== "false";
+}

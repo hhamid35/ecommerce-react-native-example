@@ -4,7 +4,9 @@ import SearchableDropdown from "react-native-searchable-dropdown";
 import { colors } from "../../constants";
 import scanIcon from "../../assets/icons/scan_icons.png";
 
-const SearchBar = ({ searchItems, handleProductPress }) => {
+const SearchBar = ({ searchItems, handleProductPress, onScanPress, scanEnabled = true }) => {
+  const scanDisabled = scanEnabled === false;
+
   return (
     <View style={styles.searchContainer} testID="search-bar">
       <View style={styles.inputContainer} testID="search-bar-input-container">
@@ -48,8 +50,24 @@ const SearchBar = ({ searchItems, handleProductPress }) => {
         />
       </View>
       <View style={styles.buttonContainer}>
-        <TouchableOpacity style={styles.scanButton} testID="search-bar-scan-btn">
-          <Text style={styles.scanButtonText} testID="search-bar-scan-text">Scan</Text>
+        <TouchableOpacity
+          style={[
+            styles.scanButton,
+            scanDisabled ? styles.scanButtonDisabled : null,
+          ]}
+          testID="search-bar-scan-btn"
+          onPress={onScanPress}
+          disabled={scanDisabled}
+        >
+          <Text
+            style={[
+              styles.scanButtonText,
+              scanDisabled ? styles.scanButtonTextDisabled : null,
+            ]}
+            testID="search-bar-scan-text"
+          >
+            Scan
+          </Text>
           <Image source={scanIcon} style={{ width: 20, height: 20 }} testID="search-bar-scan-icon" />
         </TouchableOpacity>
       </View>
@@ -92,6 +110,12 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: colors.light,
     fontWeight: "bold",
+  },
+  scanButtonDisabled: {
+    backgroundColor: colors.muted,
+  },
+  scanButtonTextDisabled: {
+    color: colors.light,
   },
 });
 
