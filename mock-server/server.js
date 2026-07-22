@@ -79,6 +79,7 @@ let products = [
     _id: "prod001",
     title: "Classic White T-Shirt",
     sku: "GAR-001",
+    externalIds: [],
     price: 19.99,
     quantity: 50,
     description: "A comfortable everyday white t-shirt made from 100% cotton.",
@@ -92,6 +93,7 @@ let products = [
     _id: "prod002",
     title: "Blue Denim Jeans",
     sku: "GAR-002",
+    externalIds: [],
     price: 49.99,
     quantity: 30,
     description: "Slim-fit blue denim jeans for a modern look.",
@@ -105,6 +107,7 @@ let products = [
     _id: "prod003",
     title: "Wireless Bluetooth Headphones",
     sku: "ELC-001",
+    externalIds: [],
     price: 89.99,
     quantity: 20,
     description: "High-quality wireless headphones with noise cancellation.",
@@ -118,6 +121,7 @@ let products = [
     _id: "prod004",
     title: "Smartphone Stand",
     sku: "ELC-002",
+    externalIds: [],
     price: 14.99,
     quantity: 100,
     description: "Adjustable aluminum smartphone and tablet stand.",
@@ -131,6 +135,7 @@ let products = [
     _id: "prod005",
     title: "Face Moisturizer SPF 30",
     sku: "COS-001",
+    externalIds: [],
     price: 24.99,
     quantity: 60,
     description: "Daily face moisturizer with SPF 30 sun protection.",
@@ -144,6 +149,7 @@ let products = [
     _id: "prod006",
     title: "Lipstick Set (6 Colors)",
     sku: "COS-002",
+    externalIds: [],
     price: 34.99,
     quantity: 40,
     description: "Long-lasting matte lipstick set in 6 vibrant shades.",
@@ -157,6 +163,7 @@ let products = [
     _id: "prod007",
     title: "Organic Basmati Rice (5kg)",
     sku: "GRO-001",
+    externalIds: [],
     price: 12.99,
     quantity: 200,
     description: "Premium organic basmati rice, long grain and aromatic.",
@@ -170,6 +177,7 @@ let products = [
     _id: "prod008",
     title: "Extra Virgin Olive Oil (1L)",
     sku: "GRO-002",
+    externalIds: [],
     price: 18.99,
     quantity: 80,
     description: "Cold-pressed extra virgin olive oil from Mediterranean farms.",
@@ -340,6 +348,107 @@ app.post("/login", (req, res) => {
   res.json({ success: true, message: "Login successful", data: safeUser });
 });
 
+// ─── Scan resolution helpers ───────────────────────────────────────────────────
+
+const MAX_SCAN_CODE_LENGTH = 512;
+
+function extractCodeFromUrl(rawCode) {
+  try {
+    if (/^https?:\/\//i.test(rawCode)) {
+      const url = new URL(rawCode);
+      const params = ["sku", "code", "barcode", "externalId"];
+      for (const param of params) {
+        const value = url.searchParams.get(param);
+        if (value) return value;
+      }
+      const segments = url.pathname.split("/").filter(Boolean);
+      if (segments.length > 0) {
+        return segments[segments.length - 1];
+      }
+    }
+  } catch (error) {
+    // Fall through to raw code when the payload is not a valid URL.
+  }
+  return rawCode;
+}
+
+function normalizeScanCode(rawCode) {
+  if (typeof rawCode !== "string") return "";
+  const trimmed = rawCode.trim();
+  if (!trimmed) return "";
+  return extractCodeFromUrl(trimmed).trim().toUpperCase();
+}
+
+function findProductsByScanCode(normalizedCode) {
+  return products.filter((product) => {
+    const skuMatch = (product.sku || "").toUpperCase() === normalizedCode;
+    const externalMatch = (product.externalIds || []).some(
+      (id) => id.toUpperCase() === normalizedCode
+    );
+    return skuMatch || externalMatch;
+  });
+}
+
+// GET /products/resolve?code=
+app.get("/products/resolve", (req, res) => {
+  const rawCode = req.query.code;
+
+  if (typeof rawCode !== "string" || rawCode.trim() === "") {
+    return res.status(400).json({
+      success: false,
+      status: 400,
+      reason: "INVALID_SCAN_CODE",
+      message: "Scan code is required",
+    });
+  }
+
+  if (rawCode.length > MAX_SCAN_CODE_LENGTH) {
+    return res.status(400).json({
+      success: false,
+      status: 400,
+      reason: "INVALID_SCAN_CODE",
+      message: "Scan code is required",
+    });
+  }
+
+  const normalizedCode = normalizeScanCode(rawCode);
+  if (!normalizedCode) {
+    return res.status(400).json({
+      success: false,
+      status: 400,
+      reason: "INVALID_SCAN_CODE",
+      message: "Scan code is required",
+    });
+  }
+
+  const matches = findProductsByScanCode(normalizedCode);
+
+  if (matches.length === 0) {
+    return res.status(404).json({
+      success: false,
+      status: 404,
+      reason: "PRODUCT_NOT_FOUND",
+      message: "No product found for this code",
+    });
+  }
+
+  if (matches.length > 1) {
+    return res.status(409).json({
+      success: false,
+      status: 409,
+      reason: "DUPLICATE_SCAN_CODE",
+      message: "Multiple products share this scan code",
+    });
+  }
+
+  return res.json({
+    success: true,
+    status: 200,
+    message: "product resolved",
+    data: matches[0],
+  });
+});
+
 // GET /products
 app.get("/products", (req, res) => {
   res.json({ success: true, data: products });
@@ -347,7 +456,7 @@ app.get("/products", (req, res) => {
 
 // POST /product  (admin: add product)
 app.post("/product", adminMiddleware, (req, res) => {
-  const { title, sku, price, image, description, category, quantity } = req.body;
+  const { title, sku, price, image, description, category, quantity, externalIds } = req.body;
   if (!title || !price) {
     return res.status(400).json({ success: false, message: "Title and price are required" });
   }
@@ -356,6 +465,7 @@ app.post("/product", adminMiddleware, (req, res) => {
     _id: uuidv4(),
     title,
     sku: sku || "",
+    externalIds: Array.isArray(externalIds) ? externalIds : [],
     price: parseFloat(price),
     quantity: parseInt(quantity) || 0,
     description: description || "",
@@ -373,12 +483,13 @@ app.post("/update-product", adminMiddleware, (req, res) => {
   if (idx === -1) {
     return res.status(404).json({ success: false, message: "Product not found" });
   }
-  const { title, sku, price, image, description, category, quantity } = req.body;
+  const { title, sku, price, image, description, category, quantity, externalIds } = req.body;
   const cat = categories.find((c) => c._id === category);
   products[idx] = {
     ...products[idx],
     title: title || products[idx].title,
     sku: sku || products[idx].sku,
+    externalIds: Array.isArray(externalIds) ? externalIds : products[idx].externalIds || [],
     price: price ? parseFloat(price) : products[idx].price,
     quantity: quantity !== undefined ? parseInt(quantity) : products[idx].quantity,
     description: description || products[idx].description,
@@ -601,6 +712,7 @@ app.listen(PORT, "0.0.0.0", () => {
   console.log(`   POST   /register`);
   console.log(`   POST   /login`);
   console.log(`   GET    /products`);
+  console.log(`   GET    /products/resolve?code=`);
   console.log(`   POST   /product              (admin)`);
   console.log(`   POST   /update-product?id=   (admin)`);
   console.log(`   GET    /delete-product?id=   (admin)`);
@@ -623,7 +735,8 @@ app.listen(PORT, "0.0.0.0", () => {
   console.log(`   User token  : mock-user-token-001`);
   console.log(`\n👤 Test credentials:`);
   console.log(`   Admin  → email: admin@easybuy.com  | password: admin123`);
-  console.log(`   User   → email: user@easybuy.com   | password: user123\n`);
+  console.log(`   User   → email: user@easybuy.com   | password: user123`);
+  console.log(`\n📷 Sample scan codes: GAR-001, ELC-001, GRO-001\n`);
 });
 
 // Made with Bob

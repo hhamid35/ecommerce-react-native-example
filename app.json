@@ -21,7 +21,8 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.abidrazaa.EasyBuy",
       "infoPlist": {
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSCameraUsageDescription": "EasyBuy uses the camera to scan product barcodes and QR codes."
       }
     },
     "android": {
@@ -31,7 +32,8 @@
       },
       "package": "com.abidrazaa.EasyBuy",
       "permissions": [
-        "android.permission.RECORD_AUDIO"
+        "android.permission.RECORD_AUDIO",
+        "android.permission.CAMERA"
       ]
     },
     "web": {
@@ -41,6 +43,13 @@
       "policy": "appVersion"
     },
     "plugins": [
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "EasyBuy uses the camera to scan product barcodes and QR codes.",
+          "barcodeScannerEnabled": true
+        }
+      ],
       [
         "expo-image-picker",
         {

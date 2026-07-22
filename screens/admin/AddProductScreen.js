@@ -20,6 +20,7 @@ import ProgressDialog from "react-native-progress-dialog";
 import { AntDesign } from "@expo/vector-icons";
 import { useEffect } from "react";
 import DropDownPicker from "react-native-dropdown-picker";
+import { parseExternalIds } from "../../utils/parseExternalIds";
 
 const AddProductScreen = ({ navigation, route }) => {
   const { authUser } = route.params;
@@ -27,6 +28,7 @@ const AddProductScreen = ({ navigation, route }) => {
   const [title, setTitle] = useState("");
   const [price, setPrice] = useState("");
   const [sku, setSku] = useState("");
+  const [externalIdsText, setExternalIdsText] = useState("");
   const [image, setImage] = useState("");
   const [error, setError] = useState("");
   const [quantity, setQuantity] = useState("");
@@ -127,6 +129,7 @@ const AddProductScreen = ({ navigation, route }) => {
         .createProduct({
           title: title,
           sku: sku,
+          externalIds: parseExternalIds(externalIdsText),
           price: price,
           image: image,
           description: description,
@@ -213,6 +216,14 @@ const AddProductScreen = ({ navigation, route }) => {
             placeholderTextColor={colors.muted}
             radius={5}
             testID="add-product-sku-input"
+          />
+          <CustomInput
+            value={externalIdsText}
+            setValue={setExternalIdsText}
+            placeholder={"External scan IDs (comma separated)"}
+            placeholderTextColor={colors.muted}
+            radius={5}
+            testID="add-product-external-ids-input"
           />
           <CustomInput
             value={title}

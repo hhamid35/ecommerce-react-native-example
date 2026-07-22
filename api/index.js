@@ -24,6 +24,18 @@ export const createProduct = (payload) => post("/product", payload);
 export const updateProduct = (id, payload) =>
   post(`/update-product?id=${q(id)}`, payload);
 export const deleteProduct = (id) => get(`/delete-product?id=${q(id)}`);
+export const resolveProductByScanCode = (code) => {
+  if (!code || typeof code !== "string" || code.trim() === "") {
+    return Promise.resolve({
+      success: false,
+      status: 400,
+      reason: "INVALID_SCAN_CODE",
+      message: "Scan code is required",
+    });
+  }
+
+  return get(`/products/resolve?code=${q(code)}`);
+};
 
 // ---- Categories ----
 export const getCategories = () => get("/categories");

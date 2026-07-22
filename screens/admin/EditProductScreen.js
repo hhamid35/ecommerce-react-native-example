@@ -18,6 +18,7 @@ import CustomAlert from "../../components/CustomAlert/CustomAlert";
 import * as ImagePicker from "expo-image-picker";
 import ProgressDialog from "react-native-progress-dialog";
 import { AntDesign } from "@expo/vector-icons";
+import { parseExternalIds } from "../../utils/parseExternalIds";
 
 const EditProductScreen = ({ navigation, route }) => {
   const { product, authUser } = route.params;
@@ -26,6 +27,7 @@ const EditProductScreen = ({ navigation, route }) => {
   const [title, setTitle] = useState("");
   const [price, setPrice] = useState("");
   const [sku, setSku] = useState("");
+  const [externalIdsText, setExternalIdsText] = useState("");
   const [image, setImage] = useState("");
   const [error, setError] = useState("");
   const [quantity, setQuantity] = useState("");
@@ -68,6 +70,7 @@ const EditProductScreen = ({ navigation, route }) => {
         .updateProduct(product._id, {
           title: title,
           sku: sku,
+          externalIds: parseExternalIds(externalIdsText),
           price: price,
           image: image,
           description: description,
@@ -97,6 +100,7 @@ const EditProductScreen = ({ navigation, route }) => {
     setImage(`${network.serverip}/uploads/${product?.image}`);
     setTitle(product.title);
     setSku(product.sku);
+    setExternalIdsText((product.externalIds || []).join(", "));
     setQuantity(product.quantity.toString());
     setPrice(product.price.toString());
     setDescription(product.description);
@@ -154,6 +158,14 @@ const EditProductScreen = ({ navigation, route }) => {
             placeholderTextColor={colors.muted}
             radius={5}
             testID="edit-product-sku-input"
+          />
+          <CustomInput
+            value={externalIdsText}
+            setValue={setExternalIdsText}
+            placeholder={"External scan IDs (comma separated)"}
+            placeholderTextColor={colors.muted}
+            radius={5}
+            testID="edit-product-external-ids-input"
           />
           <CustomInput
             value={title}
