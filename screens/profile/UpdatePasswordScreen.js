@@ -44,7 +44,7 @@ const UpdatePasswordScreen = ({ navigation, route }) => {
             setError("Password is updated successfully ");
           } else {
             setAlertType("error");
-            setError(result.message);
+setError(result.message || "Something went wrong. Please try again.");
           }
         })
         .catch((error) => {
