@@ -1,123 +1,52 @@
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
-import React, { useState } from "react";
+import React from "react";
 import { Ionicons } from "@expo/vector-icons";
-import ProgressDialog from "react-native-progress-dialog";
 import { colors } from "../../constants";
 import CustomInput from "../../components/CustomInput";
 import CustomButton from "../../components/CustomButton";
-import CustomAlert from "../../components/CustomAlert/CustomAlert";
-import ConnectionAlert from "../../components/ConnectionAlert/ConnectionAlert";
-import * as api from "../../api";
-import { normalizeEmail, validateEmail } from "../../utils/passwordPolicy";
-import {
-  RECOVERY_MESSAGES,
-  messageForRecoveryError,
-} from "../../utils/passwordRecovery";
 
-const ForgetPasswordScreen = ({ navigation, route }) => {
-  const [email, setEmail] = useState(route?.params?.email ?? "");
-  const [error, setError] = useState("");
-  const [alertType, setAlertType] = useState("error");
-  const [isLoading, setIsLoading] = useState(false);
+const sendInstructionsHandle = () => {
+  //TODO: handle user verfication and mail password reset link
+};
 
-  // method to request a reset code and move on to the verify step
-  const sendInstructionsHandle = async () => {
-    const emailError = validateEmail(email);
-    if (emailError) {
-      setAlertType("error");
-      return setError(emailError);
-    }
-    const normalized = normalizeEmail(email);
-    setIsLoading(true);
-    setError("");
-    try {
-      const result = await api.requestPasswordReset(normalized);
-      if (result.success) {
-        navigation.navigate("verifyresetcode", {
-          email: normalized,
-          notice: RECOVERY_MESSAGES.requestSent,
-        });
-      } else if (result.err === "RESET_THROTTLED") {
-        // The throttle applies to every email, so moving on reveals nothing.
-        navigation.navigate("verifyresetcode", {
-          email: normalized,
-          notice: RECOVERY_MESSAGES.throttled,
-        });
-      } else {
-        setAlertType("error");
-        setError(messageForRecoveryError(result));
-      }
-    } catch (err) {
-      console.warn("[password-reset] network error", err?.message);
-      setAlertType("error");
-      setError(RECOVERY_MESSAGES.network);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
+const ForgetPasswordScreen = ({ navigation }) => {
   return (
-    <ConnectionAlert onChange={() => {}}>
-      <View style={styles.container} testID="forget-password-screen">
-        <ProgressDialog visible={isLoading} label={"Sending ..."} />
-        <View style={styles.TopBarContainer}>
-          <TouchableOpacity
-            onPress={() => {
-              navigation.goBack();
-            }}
-            testID="forget-password-back-btn"
-          >
-            <Ionicons
-              name="arrow-back-circle-outline"
-              size={30}
-              color={colors.muted}
-            />
-          </TouchableOpacity>
-        </View>
-        <View style={styles.screenNameContainer}>
-          <View>
-            <Text style={styles.screenNameText} testID="forget-password-heading">Reset Password</Text>
-          </View>
-          <View>
-            <Text style={styles.screenNameParagraph} testID="forget-password-instruction">
-              Enter the email associated with your account and we'll send you a
-              6-digit code to reset your password.
-            </Text>
-          </View>
-        </View>
-        <View style={styles.formContainer}>
-          <CustomAlert message={error} type={alertType} testID="forget-password-alert" />
-          <CustomInput
-            value={email}
-            setValue={setEmail}
-            placeholder={"Enter your Email Address"}
-            placeholderTextColor={colors.muted}
-            keyboardType={"email-address"}
-            autoCapitalize={"none"}
-            textContentType={"emailAddress"}
-            accessibilityLabel={"Email address"}
-            radius={5}
-            testID="forget-password-email-input"
+    <View style={styles.container} testID="forget-password-screen">
+      <View style={styles.TopBarContainer}>
+        <TouchableOpacity
+          onPress={() => {
+            navigation.goBack();
+          }}
+          testID="forget-password-back-btn"
+        >
+          <Ionicons
+            name="arrow-back-circle-outline"
+            size={30}
+            color={colors.muted}
           />
+        </TouchableOpacity>
+      </View>
+      <View style={styles.screenNameContainer}>
+        <View>
+          <Text style={styles.screenNameText} testID="forget-password-heading">Reset Password</Text>
         </View>
-        <CustomButton
-          text={"Send Code"}
-          onPress={sendInstructionsHandle}
-          radius={5}
-          testID="forget-password-submit-btn"
-        />
-        <View style={styles.bottomContainer}>
-          <Text
-            onPress={() => navigation.navigate("login")}
-            style={styles.linkText}
-            accessibilityRole="link"
-            testID="forget-password-login-link"
-          >
-            Back to login
+        <View>
+          <Text style={styles.screenNameParagraph} testID="forget-password-instruction">
+            Enter the email associated with your account and we'll send an email
+            with instruction to reset the password.
           </Text>
         </View>
       </View>
-    </ConnectionAlert>
+      <View style={styles.formContainer}>
+        <CustomInput placeholder={"Enter your Email Address"} testID="forget-password-email-input" />
+      </View>
+      <CustomButton
+        text={"Send Instruction"}
+        onPress={sendInstructionsHandle}
+        radius={5}
+        testID="forget-password-submit-btn"
+      />
+    </View>
   );
 };
 
@@ -163,16 +92,5 @@ const styles = StyleSheet.create({
     display: "flex",
     width: "100%",
     flexDirecion: "row",
-  },
-  bottomContainer: {
-    marginTop: 10,
-    display: "flex",
-    flexDirection: "row",
-    justifyContent: "center",
-  },
-  linkText: {
-    color: colors.primary,
-    fontSize: 15,
-    fontWeight: "600",
   },
 });

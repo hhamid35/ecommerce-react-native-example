@@ -15,14 +15,6 @@ export const register = (payload) => post("/register", payload);
 export const login = (email, password) => post("/login", { email, password });
 export const resetPassword = (userId, body) =>
   post(`/reset-password?id=${q(userId)}`, body);
-// Signed-out password recovery: request a code, exchange it for a reset
-// token, then set the new password with that token.
-export const requestPasswordReset = (email) =>
-  post("/forgot-password", { email });
-export const verifyResetCode = (email, code) =>
-  post("/verify-reset-code", { email, code });
-export const setNewPassword = (resetToken, newPassword) =>
-  post("/set-new-password", { resetToken, newPassword });
 export const deleteUser = (userId) => get(`/delete-user?id=${q(userId)}`);
 
 // ---- Products ----
@@ -63,4 +55,4 @@ export const uploadPhoto = (formData) => post("/photos/upload", formData);
 
 // Re-export the base-URL resolver so screens can build image URLs through
 // the same seam that decides where the backend lives.
-export { getBaseUrl, imageUrl, isPasswordRecoveryEnabled } from "./config";
+export { getBaseUrl, imageUrl } from "./config";
