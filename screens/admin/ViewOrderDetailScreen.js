@@ -15,13 +15,6 @@ import ProgressDialog from "react-native-progress-dialog";
 import BasicProductList from "../../components/BasicProductList/BasicProductList";
 import CustomButton from "../../components/CustomButton";
 import DropDownPicker from "react-native-dropdown-picker";
-import PaymentStatusBadge from "../../components/PaymentStatusBadge";
-import { PAYMENT_METHODS, PAYMENT_STATUS } from "../../constants/Payment";
-import {
-  formatAmount,
-  getPaymentMethod,
-  getPaymentStatus,
-} from "../../utils/payment";
 
 const ViewOrderDetailScreen = ({ navigation, route }) => {
   const { orderDetail } = route.params;
@@ -34,7 +27,6 @@ const ViewOrderDetailScreen = ({ navigation, route }) => {
   const [open, setOpen] = useState(false);
   const [value, setValue] = useState(null);
   const [statusDisable, setStatusDisable] = useState(false);
-  const [paymentOrder, setPaymentOrder] = useState(orderDetail);
   const [items, setItems] = useState([
     { label: "Pending", value: "pending" },
     { label: "Shipped", value: "shipped" },
@@ -81,7 +73,6 @@ const ViewOrderDetailScreen = ({ navigation, route }) => {
         if (result.success == true) {
           setError(`Order status is successfully updated to ${value}`);
           setAlertType("success");
-          if (result.data) setPaymentOrder(result.data);
           setIsloading(false);
         }
       })
@@ -89,39 +80,6 @@ const ViewOrderDetailScreen = ({ navigation, route }) => {
         setAlertType("error");
         setError(error);
         console.log("error", error);
-        setIsloading(false);
-      });
-  };
-
-  //method to record cash collected for a COD order using API call
-  const handleMarkCashCollected = (id) => {
-    setIsloading(true);
-    setError("");
-    setAlertType("error");
-
-    api
-      .updatePaymentStatus(id, "paid") //API call
-      .then((result) => {
-        console.log("[payment] mark_cash_collected", {
-          orderId: paymentOrder?.orderId,
-          success: result?.success === true,
-        });
-        if (result?.success === true) {
-          setPaymentOrder(result.data);
-          setAlertType("success");
-          setError("Cash collected — payment marked as Paid");
-        } else {
-          setError(result?.message || "Could not update payment status");
-        }
-      })
-      .catch(() => {
-        console.log("[payment] mark_cash_collected", {
-          orderId: paymentOrder?.orderId,
-          success: false,
-        });
-        setError("Could not update payment status");
-      })
-      .finally(() => {
         setIsloading(false);
       });
   };
@@ -218,43 +176,6 @@ const ViewOrderDetailScreen = ({ navigation, route }) => {
               Delivered on {orderDetail?.deliveredOn}
             </Text>
           )}
-        </View>
-        <View style={styles.containerNameContainer}>
-          <View>
-            <Text style={styles.containerNameText} testID="view-order-detail-payment-heading">Payment</Text>
-          </View>
-        </View>
-        <View style={styles.orderInfoContainer}>
-          <PaymentStatusBadge order={paymentOrder} showSummary testID="view-order-detail-payment" />
-          {paymentOrder?.paid_at && (
-            <Text style={styles.secondarytextSm} testID="view-order-detail-paid-date">
-              Paid on {dateFormat(paymentOrder?.paid_at)}
-            </Text>
-          )}
-          {paymentOrder?.payment_reference && (
-            <Text style={styles.secondarytextSm} testID="view-order-detail-payment-reference">
-              Reference: {paymentOrder?.payment_reference}
-            </Text>
-          )}
-          {getPaymentMethod(paymentOrder) === PAYMENT_METHODS.CARD_DEMO &&
-            paymentOrder?.card_last4 && (
-              <Text style={styles.secondarytextSm} testID="view-order-detail-payment-card">
-                {paymentOrder?.card_brand} •••• {paymentOrder?.card_last4}
-              </Text>
-            )}
-          <Text style={styles.secondarytextSm} testID="view-order-detail-payment-amount">
-            Amount: {formatAmount(paymentOrder?.amount)}
-          </Text>
-          {getPaymentMethod(paymentOrder) === PAYMENT_METHODS.COD &&
-            getPaymentStatus(paymentOrder) === PAYMENT_STATUS.PENDING && (
-              <View style={styles.markPaidContainer}>
-                <CustomButton
-                  text={"Mark cash collected"}
-                  onPress={() => handleMarkCashCollected(orderDetail?._id)}
-                  testID="view-order-detail-mark-paid-btn"
-                />
-              </View>
-            )}
         </View>
         <View style={styles.containerNameContainer}>
           <View>
@@ -468,10 +389,6 @@ const styles = StyleSheet.create({
     color: colors.muted,
     fontSize: 15,
     fontWeight: "bold",
-  },
-  markPaidContainer: {
-    width: "100%",
-    marginTop: 10,
   },
   emptyView: {
     height: 20,
