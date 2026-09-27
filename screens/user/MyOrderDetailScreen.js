@@ -13,6 +13,9 @@ import CustomAlert from "../../components/CustomAlert/CustomAlert";
 import ProgressDialog from "react-native-progress-dialog";
 import BasicProductList from "../../components/BasicProductList/BasicProductList";
 import StepIndicator from "react-native-step-indicator";
+import PaymentStatusBadge from "../../components/PaymentStatusBadge";
+import { PAYMENT_METHODS } from "../../constants/Payment";
+import { formatAmount, getPaymentMethod } from "../../utils/payment";
 
 const MyOrderDetailScreen = ({ navigation, route }) => {
   const { orderDetail } = route.params;
@@ -181,6 +184,33 @@ const MyOrderDetailScreen = ({ navigation, route }) => {
               labels={labels}
             />
           </View>
+        </View>
+        <View style={styles.containerNameContainer}>
+          <View>
+            <Text style={styles.containerNameText} testID="my-order-detail-payment-heading">Payment</Text>
+          </View>
+        </View>
+        <View style={styles.orderInfoContainer}>
+          <PaymentStatusBadge order={orderDetail} showSummary testID="my-order-detail-payment" />
+          {orderDetail?.paid_at && (
+            <Text style={styles.secondarytextSm} testID="my-order-detail-paid-date">
+              Paid on {dateFormat(orderDetail?.paid_at)}
+            </Text>
+          )}
+          {orderDetail?.payment_reference && (
+            <Text style={styles.secondarytextSm} testID="my-order-detail-payment-reference">
+              Reference: {orderDetail?.payment_reference}
+            </Text>
+          )}
+          {getPaymentMethod(orderDetail) === PAYMENT_METHODS.CARD_DEMO &&
+            orderDetail?.card_last4 && (
+              <Text style={styles.secondarytextSm} testID="my-order-detail-payment-card">
+                {orderDetail?.card_brand} •••• {orderDetail?.card_last4}
+              </Text>
+            )}
+          <Text style={styles.secondarytextSm} testID="my-order-detail-payment-amount">
+            Amount: {formatAmount(orderDetail?.amount)}
+          </Text>
         </View>
 
         <View style={styles.containerNameContainer}>

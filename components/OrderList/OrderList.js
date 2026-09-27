@@ -1,6 +1,7 @@
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import React, { useState, useEffect } from "react";
 import { colors } from "../../constants";
+import PaymentStatusBadge from "../PaymentStatusBadge";
 
 function getTime(date) {
   let t = new Date(date);
@@ -80,10 +81,16 @@ const OrderList = ({ item, onPress, testID }) => {
         <Text style={styles.secondaryText} testID={testID ? `${testID}-total` : undefined}>Total Amount : {totalCost}$</Text>
       </View>
       <View style={styles.innerRow}>
+        <PaymentStatusBadge order={item} testID={testID ? `${testID}-payment` : undefined} />
+      </View>
+      <View style={styles.innerRow}>
         <TouchableOpacity style={styles.detailButton} onPress={onPress} testID={testID ? `${testID}-details-btn` : undefined}>
           <Text>Details</Text>
         </TouchableOpacity>
-        <Text style={styles.secondaryText} testID={testID ? `${testID}-status` : undefined}>{item?.status}</Text>
+        <View style={styles.deliveryStatus}>
+          <Text style={styles.secondaryText}>Delivery: </Text>
+          <Text style={styles.secondaryText} testID={testID ? `${testID}-status` : undefined}>{item?.status}</Text>
+        </View>
       </View>
     </View>
   );
@@ -126,6 +133,11 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: colors.muted,
     fontWeight: "bold",
+  },
+  deliveryStatus: {
+    display: "flex",
+    flexDirection: "row",
+    alignItems: "center",
   },
   timeDateContainer: {
     display: "flex",
