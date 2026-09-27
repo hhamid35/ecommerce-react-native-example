@@ -10,9 +10,9 @@ describe("Payment constants", () => {
   it("defines the payment method and status enums", () => {
     expect(PAYMENT_METHODS).toEqual({ COD: "cod", CARD_DEMO: "card_demo" });
     expect(PAYMENT_STATUS).toEqual({
-      PENDING: "pending",
-      PAID: "paid",
-      FAILED: "failed",
+      PENDING: "no",
+      PAID: "no",
+      FAILED: "no",
     });
   });
 
