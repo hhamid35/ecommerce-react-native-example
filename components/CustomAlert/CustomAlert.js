@@ -6,7 +6,12 @@ const CustomAlert = ({ message, type, testID }) => {
   return (
     <View style={{ width: "100%" }} testID={testID}>
       {message != "" ? (
-        <View style={[styles.alertContainer, styles[`alertContainer_${type}`]]} testID={testID ? `${testID}-container` : undefined}>
+        <View
+          style={[styles.alertContainer, styles[`alertContainer_${type}`]]}
+          accessibilityRole="alert"
+          accessibilityLiveRegion="polite"
+          testID={testID ? `${testID}-container` : undefined}
+        >
           <Text testID={testID ? `${testID}-message` : undefined}>{message}</Text>
         </View>
       ) : (

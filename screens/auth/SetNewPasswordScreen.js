@@ -8,64 +8,75 @@ import CustomButton from "../../components/CustomButton";
 import CustomAlert from "../../components/CustomAlert/CustomAlert";
 import ConnectionAlert from "../../components/ConnectionAlert/ConnectionAlert";
 import * as api from "../../api";
-import { normalizeEmail, validateEmail } from "../../utils/passwordPolicy";
+import {
+  PASSWORD_RULE_TEXT,
+  validatePassword,
+  validatePasswordConfirmation,
+} from "../../utils/passwordPolicy";
 import {
   RECOVERY_MESSAGES,
+  isRestartRequired,
   messageForRecoveryError,
 } from "../../utils/passwordRecovery";
 
-const ForgetPasswordScreen = ({ navigation, route }) => {
-  const [email, setEmail] = useState(route?.params?.email ?? "");
-  const [error, setError] = useState("");
-  const [alertType, setAlertType] = useState("error");
+const SetNewPasswordScreen = ({ navigation, route }) => {
+  const email = route?.params?.email;
+  const resetToken = route?.params?.resetToken;
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [error, setError] = useState(
+    resetToken ? "" : RECOVERY_MESSAGES.tokenInvalid
+  );
   const [isLoading, setIsLoading] = useState(false);
+  const [restartRequired, setRestartRequired] = useState(!resetToken);
 
-  // method to request a reset code and move on to the verify step
-  const sendInstructionsHandle = async () => {
-    const emailError = validateEmail(email);
-    if (emailError) {
-      setAlertType("error");
-      return setError(emailError);
-    }
-    const normalized = normalizeEmail(email);
+  // method to set the new password with the reset token and return to login
+  const submitHandle = async () => {
+    const validationError =
+      validatePassword(newPassword) ||
+      validatePasswordConfirmation(newPassword, confirmPassword);
+    if (validationError) return setError(validationError);
     setIsLoading(true);
     setError("");
     try {
-      const result = await api.requestPasswordReset(normalized);
+      const result = await api.setNewPassword(resetToken, newPassword);
       if (result.success) {
-        navigation.navigate("verifyresetcode", {
-          email: normalized,
-          notice: RECOVERY_MESSAGES.requestSent,
-        });
-      } else if (result.err === "RESET_THROTTLED") {
-        // The throttle applies to every email, so moving on reveals nothing.
-        navigation.navigate("verifyresetcode", {
-          email: normalized,
-          notice: RECOVERY_MESSAGES.throttled,
+        // Reset the stack so Back can't return to a used reset token.
+        navigation.reset({
+          index: 0,
+          routes: [
+            {
+              name: "login",
+              params: { successMessage: RECOVERY_MESSAGES.success, email },
+            },
+          ],
         });
       } else {
-        setAlertType("error");
         setError(messageForRecoveryError(result));
+        setRestartRequired(isRestartRequired(result.err));
       }
     } catch (err) {
       console.warn("[password-reset] network error", err?.message);
-      setAlertType("error");
       setError(RECOVERY_MESSAGES.network);
     } finally {
       setIsLoading(false);
     }
   };
 
+  const restartHandle = () => {
+    navigation.navigate("forgetpassword", { email });
+  };
+
   return (
     <ConnectionAlert onChange={() => {}}>
-      <View style={styles.container} testID="forget-password-screen">
-        <ProgressDialog visible={isLoading} label={"Sending ..."} />
+      <View style={styles.container} testID="set-password-screen">
+        <ProgressDialog visible={isLoading} label={"Saving ..."} />
         <View style={styles.TopBarContainer}>
           <TouchableOpacity
             onPress={() => {
               navigation.goBack();
             }}
-            testID="forget-password-back-btn"
+            testID="set-password-back-btn"
           >
             <Ionicons
               name="arrow-back-circle-outline"
@@ -76,42 +87,62 @@ const ForgetPasswordScreen = ({ navigation, route }) => {
         </View>
         <View style={styles.screenNameContainer}>
           <View>
-            <Text style={styles.screenNameText} testID="forget-password-heading">Reset Password</Text>
+            <Text style={styles.screenNameText} testID="set-password-heading">New Password</Text>
           </View>
           <View>
-            <Text style={styles.screenNameParagraph} testID="forget-password-instruction">
-              Enter the email associated with your account and we'll send you a
-              6-digit code to reset your password.
+            <Text style={styles.screenNameParagraph} testID="set-password-rule">
+              {PASSWORD_RULE_TEXT}
             </Text>
           </View>
         </View>
         <View style={styles.formContainer}>
-          <CustomAlert message={error} type={alertType} testID="forget-password-alert" />
+          <CustomAlert message={error} type={"error"} testID="set-password-alert" />
           <CustomInput
-            value={email}
-            setValue={setEmail}
-            placeholder={"Enter your Email Address"}
+            value={newPassword}
+            setValue={setNewPassword}
+            placeholder={"New Password"}
             placeholderTextColor={colors.muted}
-            keyboardType={"email-address"}
+            secureTextEntry={true}
+            textContentType={"newPassword"}
             autoCapitalize={"none"}
-            textContentType={"emailAddress"}
-            accessibilityLabel={"Email address"}
+            accessibilityLabel={"New password"}
             radius={5}
-            testID="forget-password-email-input"
+            testID="set-password-new-input"
+          />
+          <CustomInput
+            value={confirmPassword}
+            setValue={setConfirmPassword}
+            placeholder={"Confirm New Password"}
+            placeholderTextColor={colors.muted}
+            secureTextEntry={true}
+            textContentType={"newPassword"}
+            autoCapitalize={"none"}
+            accessibilityLabel={"Confirm new password"}
+            radius={5}
+            testID="set-password-confirm-input"
           />
         </View>
-        <CustomButton
-          text={"Send Code"}
-          onPress={sendInstructionsHandle}
-          radius={5}
-          testID="forget-password-submit-btn"
-        />
+        {restartRequired ? (
+          <CustomButton
+            text={"Request a New Code"}
+            onPress={restartHandle}
+            radius={5}
+            testID="set-password-restart-btn"
+          />
+        ) : (
+          <CustomButton
+            text={"Reset Password"}
+            onPress={submitHandle}
+            radius={5}
+            testID="set-password-submit-btn"
+          />
+        )}
         <View style={styles.bottomContainer}>
           <Text
             onPress={() => navigation.navigate("login")}
             style={styles.linkText}
             accessibilityRole="link"
-            testID="forget-password-login-link"
+            testID="set-password-login-link"
           >
             Back to login
           </Text>
@@ -121,11 +152,10 @@ const ForgetPasswordScreen = ({ navigation, route }) => {
   );
 };
 
-export default ForgetPasswordScreen;
+export default SetNewPasswordScreen;
 
 const styles = StyleSheet.create({
   container: {
-    flexDirecion: "row",
     backgroundColor: colors.light,
     alignItems: "center",
     padding: 20,
@@ -162,7 +192,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     display: "flex",
     width: "100%",
-    flexDirecion: "row",
   },
   bottomContainer: {
     marginTop: 10,
