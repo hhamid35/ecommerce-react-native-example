@@ -20,6 +20,8 @@ export const deleteUser = (userId) => get(`/delete-user?id=${q(userId)}`);
 // ---- Products ----
 export const getProducts = (search) =>
   get(`/products${search ? `?search=${q(search)}` : ""}`);
+export const resolveScannedProduct = (code) =>
+  get(`/products/scan?code=${q(code)}`);
 export const createProduct = (payload) => post("/product", payload);
 export const updateProduct = (id, payload) =>
   post(`/update-product?id=${q(id)}`, payload);

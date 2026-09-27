@@ -79,6 +79,7 @@ let products = [
     _id: "prod001",
     title: "Classic White T-Shirt",
     sku: "GAR-001",
+    externalId: "0123456789012",
     price: 19.99,
     quantity: 50,
     description: "A comfortable everyday white t-shirt made from 100% cotton.",
@@ -105,6 +106,7 @@ let products = [
     _id: "prod003",
     title: "Wireless Bluetooth Headphones",
     sku: "ELC-001",
+    externalId: "0851234567890",
     price: 89.99,
     quantity: 20,
     description: "High-quality wireless headphones with noise cancellation.",
@@ -340,6 +342,83 @@ app.post("/login", (req, res) => {
   res.json({ success: true, message: "Login successful", data: safeUser });
 });
 
+// ─── Scan resolver helpers ────────────────────────────────────────────────────
+const normalizeScanCode = (value) => String(value || "").trim();
+
+const findScannableDuplicates = ({ sku, externalId, excludeId }) => {
+  const normalizedSku = sku ? String(sku).trim() : "";
+  const normalizedExternalId = externalId ? String(externalId).trim() : "";
+  return products.find((product) => {
+    if (excludeId && product._id === excludeId) {
+      return false;
+    }
+    return (
+      (normalizedSku && product.sku === normalizedSku) ||
+      (normalizedExternalId && product.externalId === normalizedExternalId)
+    );
+  });
+};
+
+// GET /products/scan?code=
+app.get("/products/scan", (req, res) => {
+  const rawCode = req.query.code;
+  if (rawCode === undefined || rawCode === null || normalizeScanCode(rawCode) === "") {
+    return res.status(400).json({
+      success: false,
+      status: 400,
+      code: "PRODUCT_SCAN_CODE_REQUIRED",
+      message: "A scanned code is required",
+      data: null,
+    });
+  }
+
+  const code = normalizeScanCode(rawCode);
+  if (code.length > 128) {
+    return res.status(400).json({
+      success: false,
+      status: 400,
+      code: "PRODUCT_SCAN_CODE_TOO_LONG",
+      message: "Scanned code exceeds maximum length of 128 characters",
+      data: null,
+    });
+  }
+
+  const matches = products.filter(
+    (product) => product.sku === code || product.externalId === code
+  );
+
+  if (matches.length === 0) {
+    return res.status(404).json({
+      success: false,
+      status: 404,
+      code: "PRODUCT_SCAN_NOT_FOUND",
+      message: "No product found for scanned code",
+      data: null,
+    });
+  }
+
+  if (matches.length > 1) {
+    return res.status(409).json({
+      success: false,
+      status: 409,
+      code: "PRODUCT_SCAN_DUPLICATE",
+      message: "Multiple products share this scanned code",
+      data: null,
+    });
+  }
+
+  const product = matches[0];
+  const matchedField = product.sku === code ? "sku" : "externalId";
+
+  return res.json({
+    success: true,
+    status: 200,
+    message: "product resolved from scanned code",
+    data: product,
+    matchedField,
+  });
+});
+
 // GET /products
 app.get("/products", (req, res) => {
   res.json({ success: true, data: products });
@@ -347,15 +426,27 @@ app.get("/products", (req, res) => {
 
 // POST /product  (admin: add product)
 app.post("/product", adminMiddleware, (req, res) => {
-  const { title, sku, price, image, description, category, quantity } = req.body;
+  const { title, sku, price, image, description, category, quantity, externalId } = req.body;
   if (!title || !price) {
     return res.status(400).json({ success: false, message: "Title and price are required" });
   }
+
+  const normalizedSku = sku ? String(sku).trim() : "";
+  const normalizedExternalId = externalId ? String(externalId).trim() : "";
+
+  if (findScannableDuplicates({ sku: normalizedSku, externalId: normalizedExternalId })) {
+    return res.status(400).json({
+      success: false,
+      message: "A product with this SKU or external ID already exists",
+    });
+  }
+
   const cat = categories.find((c) => c._id === category);
   const newProduct = {
     _id: uuidv4(),
     title,
-    sku: sku || "",
+    sku: normalizedSku,
+    externalId: normalizedExternalId || undefined,
     price: parseFloat(price),
     quantity: parseInt(quantity) || 0,
     description: description || "",
@@ -373,12 +464,34 @@ app.post("/update-product", adminMiddleware, (req, res) => {
   if (idx === -1) {
     return res.status(404).json({ success: false, message: "Product not found" });
   }
-  const { title, sku, price, image, description, category, quantity } = req.body;
+  const { title, sku, price, image, description, category, quantity, externalId } = req.body;
+  const normalizedSku = sku ? String(sku).trim() : products[idx].sku;
+  const normalizedExternalId =
+    externalId !== undefined
+      ? externalId
+        ? String(externalId).trim()
+        : ""
+      : products[idx].externalId || "";
+
+  if (
+    findScannableDuplicates({
+      sku: normalizedSku,
+      externalId: normalizedExternalId,
+      excludeId: id,
+    })
+  ) {
+    return res.status(400).json({
+      success: false,
+      message: "A product with this SKU or external ID already exists",
+    });
+  }
+
   const cat = categories.find((c) => c._id === category);
   products[idx] = {
     ...products[idx],
     title: title || products[idx].title,
-    sku: sku || products[idx].sku,
+    sku: normalizedSku,
+    externalId: normalizedExternalId || undefined,
     price: price ? parseFloat(price) : products[idx].price,
     quantity: quantity !== undefined ? parseInt(quantity) : products[idx].quantity,
     description: description || products[idx].description,
@@ -600,6 +713,7 @@ app.listen(PORT, "0.0.0.0", () => {
   console.log(`\n📋 Available endpoints:`);
   console.log(`   POST   /register`);
   console.log(`   POST   /login`);
+  console.log(`   GET    /products/scan?code=`);
   console.log(`   GET    /products`);
   console.log(`   POST   /product              (admin)`);
   console.log(`   POST   /update-product?id=   (admin)`);
