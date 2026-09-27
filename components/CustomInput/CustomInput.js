@@ -14,6 +14,10 @@ const CustomInput = ({
   keyboardType,
   maxLength,
   testID,
+  accessibilityLabel,
+  autoCapitalize,
+  autoComplete,
+  textContentType,
 }) => {
   return (
     <View style={{ width: width }} testID={testID ? `${testID}-wrapper` : undefined}>
@@ -28,6 +32,10 @@ const CustomInput = ({
         borderRadius={radius}
         maxLength={maxLength}
         keyboardType={keyboardType}
+        accessibilityLabel={accessibilityLabel}
+        autoCapitalize={autoCapitalize}
+        autoComplete={autoComplete}
+        textContentType={textContentType}
         testID={testID}
       />
     </View>
