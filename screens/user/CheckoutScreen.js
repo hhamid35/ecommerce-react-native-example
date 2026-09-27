@@ -8,7 +8,7 @@ import {
   Modal,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import BasicProductList from "../../components/BasicProductList/BasicProductList";
 import { colors } from "../../constants";
 import CustomButton from "../../components/CustomButton";
@@ -18,6 +18,19 @@ import { bindActionCreators } from "redux";
 import * as api from "../../api";
 import CustomInput from "../../components/CustomInput";
 import ProgressDialog from "react-native-progress-dialog";
+import CustomAlert from "../../components/CustomAlert/CustomAlert";
+import PaymentMethodSelector from "../../components/PaymentMethodSelector";
+import DemoPaymentSheet from "../../components/DemoPaymentSheet";
+import {
+  PAYMENT_METHODS,
+  PAYMENT_METHOD_OPTIONS,
+  isDigitalPaymentsEnabled,
+} from "../../constants/Payment";
+import {
+  createIdempotencyKey,
+  getCheckoutErrorMessage,
+  getPaymentMethodLabel,
+} from "../../utils/payment";
 
 const CheckoutScreen = ({ navigation, route }) => {
   const [modalVisible, setModalVisible] = useState(false);
@@ -34,12 +47,18 @@ const CheckoutScreen = ({ navigation, route }) => {
   const [streetAddress, setStreetAddress] = useState("");
   const [zipcode, setZipcode] = useState("");
 
-  //method to handle checkout
-  const handleCheckout = async () => {
-    setIsloading(true);
+  const digitalEnabled = isDigitalPaymentsEnabled();
+  const [paymentMethod, setPaymentMethod] = useState(PAYMENT_METHODS.COD);
+  const [paymentSheetVisible, setPaymentSheetVisible] = useState(false);
+  const [alert, setAlert] = useState({ message: "", type: "error" });
+  const [loadingLabel, setLoadingLabel] = useState("Placing Order...");
+  const submittingRef = useRef(false);
+  const idempotencyKeyRef = useRef(createIdempotencyKey());
 
-    var payload = [];
-    var totalamount = 0;
+  //method to build the checkout payload from the cart, address and payment choice
+  const buildOrderPayload = (token) => {
+    let items = [];
+    let totalamount = 0;
 
     // fetch the cart items from redux and set the total cost
     cartproduct.forEach((product) => {
@@ -48,36 +67,101 @@ const CheckoutScreen = ({ navigation, route }) => {
         price: product.price,
         quantity: product.quantity,
       };
-      totalamount += parseInt(product.price) * parseInt(product.quantity);
-      payload.push(obj);
+      totalamount += Number(product.price) * Number(product.quantity);
+      items.push(obj);
     });
 
-    api
-      .checkout({
-        items: payload,
-        amount: totalamount,
-        discount: 0,
-        payment_type: "cod",
-        country: country,
-        status: "pending",
-        city: city,
-        zipcode: zipcode,
-        shippingAddress: streetAddress,
-      }) //API call
+    const payload = {
+      items: items,
+      amount: Math.round(totalamount * 100) / 100,
+      discount: 0,
+      payment_type: paymentMethod,
+      idempotency_key: idempotencyKeyRef.current,
+      country: country,
+      status: "pending",
+      city: city,
+      zipcode: zipcode,
+      shippingAddress: streetAddress,
+    };
+    if (paymentMethod === PAYMENT_METHODS.CARD_DEMO) {
+      payload.payment = { token };
+    }
+    return payload;
+  };
+
+  //method to handle the submit button: open the demo payment sheet or place a COD order
+  const handleSubmitPress = () => {
+    if (submittingRef.current) return;
+    setAlert({ message: "", type: "error" });
+    if (paymentMethod === PAYMENT_METHODS.CARD_DEMO) {
+      setPaymentSheetVisible(true);
+    } else {
+      placeOrder(null);
+    }
+  };
+
+  //method to place the order using API call
+  const placeOrder = (token) => {
+    if (submittingRef.current) return;
+    submittingRef.current = true;
+    const method = paymentMethod;
+    setLoadingLabel(
+      method === PAYMENT_METHODS.CARD_DEMO
+        ? "Processing payment..."
+        : "Placing Order..."
+    );
+    setIsloading(true);
+    console.log("[payment] checkout_submitted", { method, hasKey: true });
+
+    return api
+      .checkout(buildOrderPayload(token)) //API call
       .then((result) => {
-        console.log("Checkout=>", result);
-        if (result.success == true) {
-          setIsloading(false);
+        if (result?.success === true) {
+          console.log("[payment] checkout_succeeded", {
+            method,
+            orderId: result?.data?.orderId,
+            payment_status: result?.data?.payment_status,
+            duplicate: !!result.duplicate,
+          });
           emptyCart("empty");
-          navigation.replace("orderconfirm");
+          setPaymentSheetVisible(false);
+          navigation.replace("orderconfirm", { order: result.data });
         } else {
-          setIsloading(false);
+          // the server definitively rejected this attempt, so the next one is new
+          console.log("[payment] checkout_rejected", {
+            method,
+            code: result?.code || "unknown",
+          });
+          idempotencyKeyRef.current = createIdempotencyKey();
+          setPaymentSheetVisible(false);
+          setAlert({ message: getCheckoutErrorMessage(result), type: "error" });
         }
       })
-      .catch((error) => {
+      .catch(() => {
+        // keep the same idempotency key so a retry replays the order that may already exist
+        console.log("[payment] checkout_error", { method, reason: "network" });
+        setPaymentSheetVisible(false);
+        setAlert({
+          message: getCheckoutErrorMessage({ code: "network_error" }),
+          type: "error",
+        });
+      })
+      .finally(() => {
+        submittingRef.current = false;
         setIsloading(false);
-        console.log("error", error);
       });
+  };
+
+  //method to handle cancelling the demo payment sheet
+  const handleCancelPayment = () => {
+    if (submittingRef.current) return;
+    setPaymentSheetVisible(false);
+    setAlert({
+      message:
+        "Payment cancelled. Your cart is unchanged — try again or choose Cash on Delivery.",
+      type: "error",
+    });
+    console.log("[payment] payment_cancelled", { method: "card_demo" });
   };
 
   // set the address and total cost on initital render
@@ -94,14 +178,20 @@ const CheckoutScreen = ({ navigation, route }) => {
     );
   }, []);
 
+  const submitText =
+    paymentMethod === PAYMENT_METHODS.CARD_DEMO
+      ? "Continue to Payment"
+      : "Submit Order";
+
   return (
     <View style={styles.container} testID="checkout-screen">
       <StatusBar testID="checkout-status-bar"></StatusBar>
-      <ProgressDialog visible={isloading} label={"Placing Order..."} />
+      <ProgressDialog visible={isloading} label={loadingLabel} />
       <View style={styles.topBarContainer}>
         <TouchableOpacity
           testID="checkout-back-btn"
           onPress={() => {
+            if (isloading) return;
             navigation.goBack();
           }}
         >
@@ -114,6 +204,7 @@ const CheckoutScreen = ({ navigation, route }) => {
         <View></View>
         <View></View>
       </View>
+      <CustomAlert message={alert.message} type={alert.type} testID="checkout-alert" />
       <ScrollView style={styles.bodyContainer} nestedScrollEnabled={true} testID="checkout-scroll">
         <Text style={styles.primaryText} testID="checkout-summary-heading">Order Summary</Text>
         <ScrollView
@@ -191,24 +282,34 @@ const CheckoutScreen = ({ navigation, route }) => {
         <View style={styles.listContainer}>
           <View style={styles.list}>
             <Text style={styles.secondaryTextSm} testID="checkout-method-label">Method</Text>
-            <Text style={styles.primaryTextSm} testID="checkout-method-value">Cash On Delivery</Text>
+            <Text style={styles.primaryTextSm} testID="checkout-method-value">
+              {getPaymentMethodLabel(paymentMethod)}
+            </Text>
           </View>
+          {digitalEnabled && (
+            <PaymentMethodSelector
+              value={paymentMethod}
+              onChange={setPaymentMethod}
+              options={PAYMENT_METHOD_OPTIONS}
+              disabled={isloading}
+              testID="checkout-payment-selector"
+            />
+          )}
         </View>
 
         <View style={styles.emptyView}></View>
       </ScrollView>
       <View style={styles.buttomContainer}>
-        {country && city && streetAddress != "" ? (
+        {country && city && streetAddress != "" && !isloading ? (
           <CustomButton
             testID="checkout-submit-btn"
-            text={"Submit Order"}
-            // onPress={() => navigation.replace("orderconfirm")}
+            text={submitText}
             onPress={() => {
-              handleCheckout();
+              handleSubmitPress();
             }}
           />
         ) : (
-          <CustomButton testID="checkout-submit-btn" text={"Submit Order"} disabled />
+          <CustomButton testID="checkout-submit-btn" text={submitText} disabled />
         )}
       </View>
       <Modal
@@ -268,6 +369,14 @@ const CheckoutScreen = ({ navigation, route }) => {
           </View>
         </View>
       </Modal>
+      <DemoPaymentSheet
+        visible={paymentSheetVisible}
+        amount={totalCost + deliveryCost}
+        processing={isloading}
+        onPay={(token) => placeOrder(token)}
+        onCancel={handleCancelPayment}
+        testID="checkout-payment-sheet"
+      />
     </View>
   );
 };

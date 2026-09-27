@@ -38,6 +38,8 @@ export const getOrders = () => get("/orders");
 export const getAdminOrders = () => get("/admin/orders");
 export const updateOrderStatus = (orderId, status) =>
   get(`/admin/order-status?orderId=${q(orderId)}&status=${q(status)}`);
+export const updatePaymentStatus = (orderId, status) =>
+  get(`/admin/payment-status?orderId=${q(orderId)}&status=${q(status)}`);
 
 // ---- Wishlist ----
 export const getWishlist = () => get("/wishlist");
