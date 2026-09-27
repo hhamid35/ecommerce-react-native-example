@@ -19,17 +19,14 @@ import ConnectionAlert from "../../components/ConnectionAlert/ConnectionAlert";
 import * as api from "../../api";
 import * as session from "../../utils/session";
 
-const LoginScreen = ({ navigation, route }) => {
-  const [email, setEmail] = useState(route?.params?.email ?? "");
+const LoginScreen = ({ navigation }) => {
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
-  // success notice passed back from the password recovery flow
-  const [notice, setNotice] = useState(route?.params?.successMessage ?? "");
   const [isloading, setIsloading] = useState(false);
 
   //method to validate the user credentials and navigate to Home Screen / Dashboard
   const loginHandle = async () => {
-    setNotice("");
     setIsloading(true);
     //[check validation] -- Start
     if (email == "") {
@@ -47,6 +44,10 @@ const LoginScreen = ({ navigation, route }) => {
     if (email.length < 6) {
       setIsloading(false);
       return setError("Email is too short");
+    }
+    if (password.length < 6) {
+      setIsloading(false);
+      return setError("Password must be 6 characters long");
     }
     //[check validation] -- End
 
@@ -98,7 +99,6 @@ const LoginScreen = ({ navigation, route }) => {
             <Text style={styles.screenNameText} testID="login-heading">Login</Text>
           </View>
           <View style={styles.formContainer}>
-            <CustomAlert message={notice} type={"success"} testID="login-success-alert" />
             <CustomAlert message={error} type={"error"} testID="login-alert" />
             <CustomInput
               value={email}
@@ -117,17 +117,15 @@ const LoginScreen = ({ navigation, route }) => {
               radius={5}
               testID="login-password-input"
             />
-            {api.isPasswordRecoveryEnabled() && (
-              <View style={styles.forgetPasswordContainer}>
-                <Text
-                  onPress={() => navigation.navigate("forgetpassword")}
-                  style={styles.ForgetText}
-                  testID="login-forget-password"
-                >
-                  Forget Password?
-                </Text>
-              </View>
-            )}
+            <View style={styles.forgetPasswordContainer}>
+              <Text
+                onPress={() => navigation.navigate("forgetpassword")}
+                style={styles.ForgetText}
+                testID="login-forget-password"
+              >
+                Forget Password?
+              </Text>
+            </View>
           </View>
         </ScrollView>
         <View style={styles.buttomContainer}>

@@ -40,14 +40,3 @@ export function getBaseUrl() {
 export function imageUrl(filename) {
   return `${getBaseUrl()}/uploads/${filename}`;
 }
-
-// Feature flag for the signed-out recovery flow. On unless explicitly set to
-// 'false' (e.g. for builds whose backend doesn't serve the endpoints yet).
-// Accessed literally so Expo can inline the EXPO_PUBLIC_* value.
-export function isPasswordRecoveryEnabled() {
-  const flag =
-    typeof process !== "undefined" &&
-    process.env &&
-    process.env.EXPO_PUBLIC_PASSWORD_RECOVERY;
-  return flag !== "false";
-}

@@ -6,11 +6,6 @@ import CustomInput from "../../components/CustomInput";
 import CustomButton from "../../components/CustomButton";
 import CustomAlert from "../../components/CustomAlert/CustomAlert";
 import * as api from "../../api";
-import {
-  PASSWORD_RULE_TEXT,
-  validatePassword,
-  validatePasswordConfirmation,
-} from "../../utils/passwordPolicy";
 
 const UpdatePasswordScreen = ({ navigation, route }) => {
   const { userID } = route.params;
@@ -22,15 +17,10 @@ const UpdatePasswordScreen = ({ navigation, route }) => {
 
   // method to update the password by the check the current password
   const updatePasswordHandle = () => {
-    const passwordError =
-      validatePassword(newPassword) ||
-      validatePasswordConfirmation(newPassword, confirmPassword);
     if (currnetPassword == newPassword) {
-      setAlertType("error");
       setError("You are not allowed to set the previous used password");
-    } else if (passwordError) {
-      setAlertType("error");
-      setError(passwordError);
+    } else if (newPassword != confirmPassword) {
+      setError("Password not matched");
     } else {
       setError("");
       api
@@ -39,13 +29,8 @@ const UpdatePasswordScreen = ({ navigation, route }) => {
           newPassword: newPassword,
         }) // API call
         .then((result) => {
-          if (result.success) {
-            setAlertType("success");
-            setError("Password is updated successfully ");
-          } else {
-            setAlertType("error");
-setError(result.message || "Something went wrong. Please try again.");
-          }
+          setAlertType("success");
+          setError("Password is updated successfully ");
         })
         .catch((error) => {
           setAlertType("error");
@@ -78,9 +63,6 @@ setError(result.message || "Something went wrong. Please try again.");
         <View>
           <Text style={styles.screenNameParagraph} testID="update-password-instruction">
             Your new password must be different from previous used password
-          </Text>
-          <Text style={styles.screenNameParagraph} testID="update-password-rule">
-            {PASSWORD_RULE_TEXT}
           </Text>
         </View>
       </View>

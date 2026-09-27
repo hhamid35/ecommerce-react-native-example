@@ -17,12 +17,6 @@ import { Ionicons } from "@expo/vector-icons";
 import CustomAlert from "../../components/CustomAlert/CustomAlert";
 import ConnectionAlert from "../../components/ConnectionAlert/ConnectionAlert";
 import * as api from "../../api";
-import {
-  PASSWORD_RULE_TEXT,
-  validateEmail,
-  validatePassword,
-  validatePasswordConfirmation,
-} from "../../utils/passwordPolicy";
 
 const SignupScreen = ({ navigation }) => {
   const [email, setEmail] = useState("");
@@ -33,18 +27,26 @@ const SignupScreen = ({ navigation }) => {
 
   //method to post the user data to server for user signup using API call
   const signUpHandle = () => {
-    const emailError = validateEmail(email);
-    if (emailError) {
-      return setError(emailError);
+    if (email == "") {
+      return setError("Please enter your email");
     }
     if (name == "") {
       return setError("Please enter your name");
     }
-    const passwordError =
-      validatePassword(password) ||
-      validatePasswordConfirmation(password, confirmPassword);
-    if (passwordError) {
-      return setError(passwordError);
+    if (password == "") {
+      return setError("Please enter your password");
+    }
+    if (!email.includes("@")) {
+      return setError("Email is not valid");
+    }
+    if (email.length < 6) {
+      return setError("Email is too short");
+    }
+    if (password.length < 5) {
+      return setError("Password must be 6 characters long");
+    }
+    if (password != confirmPassword) {
+      return setError("password does not match");
     }
     api
       .register({ email, password, name, userType: "USER" }) // API call
@@ -120,9 +122,6 @@ const SignupScreen = ({ navigation }) => {
               radius={5}
               testID="signup-password-input"
             />
-            <Text style={styles.passwordRuleText} testID="signup-password-rule">
-              {PASSWORD_RULE_TEXT}
-            </Text>
             <CustomInput
               value={confirmPassword}
               setValue={setConfirmPassword}
@@ -234,10 +233,5 @@ const styles = StyleSheet.create({
   screenNameParagraph: {
     marginTop: 5,
     fontSize: 15,
-  },
-  passwordRuleText: {
-    width: "100%",
-    fontSize: 12,
-    color: colors.muted,
   },
 });

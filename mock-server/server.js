@@ -3,12 +3,6 @@ const cors = require("cors");
 const multer = require("multer");
 const path = require("path");
 const { v4: uuidv4 } = require("uuid");
-const {
-  createPasswordResetStore,
-  normalizeEmail,
-  isValidEmail,
-  validatePasswordPolicy,
-} = require("./passwordReset");
 
 const app = express();
 const PORT = 3002;
@@ -569,94 +563,6 @@ app.post("/reset-password", (req, res) => {
   res.json({ success: true, message: "Password updated successfully" });
 });
 
-// ─── Password recovery (public) ───────────────────────────────────────────────
-// Dev-only delivery: the code is printed to this console, no email is sent.
-const passwordResets = createPasswordResetStore({
-  deliver: (email, code, expiresAt) =>
-    console.log(
-      `[password-reset] DEV CODE email=${email} code=${code} expiresAt=${new Date(expiresAt).toISOString()} (no email sent)`
-    ),
-});
-
-const findUserByEmail = (email) => users.find((u) => normalizeEmail(u.email) === email);
-
-// POST /forgot-password
-app.post("/forgot-password", (req, res) => {
-  const email = normalizeEmail(req.body && req.body.email);
-  if (!isValidEmail(email)) {
-    return res
-      .status(400)
-      .json({ success: false, err: "INVALID_EMAIL", message: "Please enter a valid email address" });
-  }
-  const user = findUserByEmail(email) || null;
-  const result = passwordResets.requestReset(email, user);
-  if (!result.ok) {
-    console.log(`[password-reset] throttled email=${email} retryAfterSeconds=${result.retryAfterSeconds}`);
-    return res.status(429).json({
-      success: false,
-      err: "RESET_THROTTLED",
-      message: "A code was sent recently. Please wait before requesting another.",
-      retryAfterSeconds: result.retryAfterSeconds,
-    });
-  }
-  console.log(`[password-reset] requested email=${email} registered=${Boolean(user)}`);
-  res.json({ success: true, message: "If an account exists for this email, we have sent a 6-digit code." });
-});
-
-// POST /verify-reset-code
-const VERIFY_FAILURES = {
-  RESET_CODE_INVALID: { status: 400, message: "The code is incorrect", outcome: "invalid" },
-  RESET_CODE_EXPIRED: { status: 400, message: "The code has expired or has already been used", outcome: "expired" },
-  RESET_ATTEMPTS_EXCEEDED: { status: 429, message: "Too many incorrect attempts", outcome: "locked" },
-};
-
-app.post("/verify-reset-code", (req, res) => {
-  const email = normalizeEmail(req.body && req.body.email);
-  const code = String((req.body && req.body.code) || "").trim();
-  // A malformed code never counts as an attempt.
-  const result = /^[0-9]{6}$/.test(code)
-    ? passwordResets.verifyCode(email, code)
-    : { ok: false, err: "RESET_CODE_INVALID" };
-  if (!result.ok) {
-    const failure = VERIFY_FAILURES[result.err];
-    console.log(`[password-reset] verify email=${email} outcome=${failure.outcome}`);
-    return res.status(failure.status).json({ success: false, err: result.err, message: failure.message });
-  }
-  console.log(`[password-reset] verify email=${email} outcome=success`);
-  res.json({
-    success: true,
-    message: "Code verified",
-    data: { resetToken: result.resetToken, expiresAt: new Date(result.expiresAt).toISOString() },
-  });
-});
-
-// POST /set-new-password
-app.post("/set-new-password", (req, res) => {
-  const { resetToken, newPassword } = req.body || {};
-  const tokenInvalid = () => {
-    console.log(`[password-reset] set-password outcome=token_invalid`);
-    return res
-      .status(400)
-      .json({ success: false, err: "RESET_TOKEN_INVALID", message: "Reset session is invalid or has expired" });
-  };
-  if (!resetToken) return tokenInvalid();
-  // Check the rule before consuming the token so a weak password keeps it usable.
-  const policyError = validatePasswordPolicy(newPassword);
-  if (policyError) {
-    console.log(`[password-reset] set-password outcome=policy`);
-    return res.status(400).json({ success: false, err: "PASSWORD_POLICY", message: policyError });
-  }
-  const result = passwordResets.consumeResetToken(String(resetToken));
-  const user = result.ok ? users.find((u) => u._id === result.userId) : null;
-  if (!user) return tokenInvalid();
-  user.password = newPassword;
-  // Rotating the token signs out every other session: authMiddleware no
-  // longer finds the old token and answers "jwt expired".
-  user.token = `mock-token-${uuidv4()}`;
-  console.log(`[password-reset] completed userId=${user._id} sessionsRevoked=true`);
-  res.json({ success: true, message: "Password reset successfully" });
-});
-
 // POST /photos/upload
 app.post("/photos/upload", upload.single("photos"), (req, res) => {
   if (!req.file) {
@@ -710,9 +616,6 @@ app.listen(PORT, "0.0.0.0", () => {
   console.log(`   POST   /checkout             (user)`);
   console.log(`   GET    /delete-user?id=`);
   console.log(`   POST   /reset-password?id=`);
-  console.log(`   POST   /forgot-password`);
-  console.log(`   POST   /verify-reset-code`);
-  console.log(`   POST   /set-new-password`);
   console.log(`   POST   /photos/upload`);
   console.log(`   GET    /uploads/:filename`);
   console.log(`\n🔑 Test tokens:`);
