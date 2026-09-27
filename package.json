@@ -18,10 +18,6 @@
     "testPathIgnorePatterns": [
       "/node_modules/",
       "/mock-server/"
-    ],
-    "transformIgnorePatterns": [
-      "/node_modules/(?!(.pnpm|react-native|@react-native|@react-native-community|expo|@expo|@expo-google-fonts|react-navigation|@react-navigation|@sentry/react-native|native-base|react-redux|redux))",
-      "/node_modules/react-native-reanimated/plugin/"
     ]
   },
   "dependencies": {
@@ -65,12 +61,10 @@
   "devDependencies": {
     "@babel/core": "^7.12.9",
     "@babel/plugin-proposal-export-namespace-from": "^7.18.9",
-    "@testing-library/react-native": "^13.3.3",
     "eslint": "^9.39.4",
     "eslint-config-expo": "~55.0.1",
     "jest": "~29.7.0",
-    "jest-expo": "~55.0.18",
-    "react-test-renderer": "19.2.0"
+    "jest-expo": "~55.0.18"
   },
   "expo": {
     "sourceDir": "."

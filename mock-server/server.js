@@ -3,7 +3,6 @@ const cors = require("cors");
 const multer = require("multer");
 const path = require("path");
 const { v4: uuidv4 } = require("uuid");
-const payments = require("./payments");
 
 const app = express();
 const PORT = 3002;
@@ -283,9 +282,6 @@ let orders = [
   },
 ];
 
-// Idempotency index for POST /checkout: `${userId}:${idempotency_key}` -> order _id
-const checkoutsByKey = new Map();
-
 // ─── Auth middleware (simple token check) ─────────────────────────────────────
 const authMiddleware = (req, res, next) => {
   const token = req.headers["x-auth-token"];
@@ -467,7 +463,7 @@ app.get("/dashboard", adminMiddleware, (req, res) => {
 
 // GET /admin/orders  (admin: all orders)
 app.get("/admin/orders", adminMiddleware, (req, res) => {
-  res.json({ success: true, data: orders.map(payments.withPaymentDefaults) });
+  res.json({ success: true, data: orders });
 });
 
 // GET /admin/users  (admin: all users)
@@ -491,64 +487,20 @@ app.get("/admin/order-status", adminMiddleware, (req, res) => {
   order.updatedAt = new Date().toISOString();
   if (status === "shipped") order.shippedOn = new Date().toISOString().split("T")[0];
   if (status === "delivered") order.deliveredOn = new Date().toISOString().split("T")[0];
-  res.json({ success: true, message: `Order status updated to ${status}`, data: payments.withPaymentDefaults(order) });
-});
-
-// GET /admin/payment-status?orderId=&status=  (admin: record cash collected for a COD order)
-app.get("/admin/payment-status", adminMiddleware, (req, res) => {
-  const { orderId, status } = req.query;
-  if (!orderId || !status) {
-    return res.status(400).json({ success: false, message: "orderId and status are required" });
-  }
-  const order = orders.find((o) => o._id === orderId);
-  if (!order) {
-    return res.status(404).json({ success: false, message: "Order not found" });
-  }
-  const r = payments.markCashCollected(order, status);
-  if (!r.ok) {
-    return res.status(r.httpStatus).json({ success: false, code: r.code, message: r.message });
-  }
-  console.log("[payment] cash_collected", { orderId: order._id, adminId: req.user._id, at: r.order.paid_at });
-  res.json({ success: true, message: "Payment status updated to paid", data: payments.withPaymentDefaults(r.order) });
+  res.json({ success: true, message: `Order status updated to ${status}`, data: order });
 });
 
 // GET /orders  (user: their own orders)
 app.get("/orders", authMiddleware, (req, res) => {
   const userOrders = orders.filter((o) => o.user._id === req.user._id);
-  res.json({ success: true, data: userOrders.map(payments.withPaymentDefaults) });
+  res.json({ success: true, data: userOrders });
 });
 
 // POST /checkout  (user: place order)
 app.post("/checkout", authMiddleware, (req, res) => {
-  const { items, amount, discount, idempotency_key, country, city, zipcode, shippingAddress, status } = req.body;
+  const { items, amount, discount, payment_type, country, city, zipcode, shippingAddress, status } = req.body;
   if (!items || items.length === 0) {
     return res.status(400).json({ success: false, message: "Cart is empty" });
-  }
-  // Replay the existing order for a repeated idempotency key (per user) instead of creating a duplicate.
-  const dedupeKey =
-    typeof idempotency_key === "string" && idempotency_key.length > 0 && idempotency_key.length <= 100
-      ? `${req.user._id}:${idempotency_key}`
-      : null;
-  if (dedupeKey && checkoutsByKey.has(dedupeKey)) {
-    const existing = orders.find((o) => o._id === checkoutsByKey.get(dedupeKey));
-    if (existing) {
-      console.log("[payment] duplicate_checkout", { userId: req.user._id, orderId: existing.orderId });
-      return res.json({
-        success: true,
-        message: "Order already placed",
-        duplicate: true,
-        data: payments.withPaymentDefaults(existing),
-      });
-    }
-  }
-  const p = payments.resolveCheckoutPayment(req.body);
-  if (!p.ok) {
-    console.log("[payment] checkout_rejected", {
-      userId: req.user._id,
-      payment_type: req.body.payment_type || "cod",
-      code: p.code,
-    });
-    return res.status(p.httpStatus).json({ success: false, code: p.code, message: p.message });
   }
   const orderItems = items.map((item) => {
     const product = products.find((p) => p._id === item.productId);
@@ -569,9 +521,9 @@ app.post("/checkout", authMiddleware, (req, res) => {
       email: req.user.email,
     },
     items: orderItems,
-    amount: Number(amount) || 0,
+    amount: amount || 0,
     discount: discount || 0,
-    ...p.fields,
+    payment_type: payment_type || "cod",
     country: country || "",
     city: city || "",
     zipcode: zipcode || "",
@@ -581,14 +533,6 @@ app.post("/checkout", authMiddleware, (req, res) => {
     updatedAt: new Date().toISOString(),
   };
   orders.push(newOrder);
-  if (dedupeKey) checkoutsByKey.set(dedupeKey, newOrder._id);
-  console.log("[payment] order_created", {
-    orderId: newOrder.orderId,
-    userId: req.user._id,
-    payment_type: newOrder.payment_type,
-    payment_status: newOrder.payment_status,
-    amount: newOrder.amount,
-  });
   res.json({ success: true, message: "Order placed successfully", data: newOrder });
 });
 
@@ -668,7 +612,6 @@ app.listen(PORT, "0.0.0.0", () => {
   console.log(`   GET    /admin/orders         (admin)`);
   console.log(`   GET    /admin/users          (admin)`);
   console.log(`   GET    /admin/order-status?orderId=&status=  (admin)`);
-  console.log(`   GET    /admin/payment-status?orderId=&status=  (admin)`);
   console.log(`   GET    /orders               (user)`);
   console.log(`   POST   /checkout             (user)`);
   console.log(`   GET    /delete-user?id=`);
